@@ -10,7 +10,7 @@ $pass = '';
 $db = 'food_ordering_db';
 
 // try lang ng condition para ma-check kung successful ang connection
-$conn = new mysqli($host, $user, $pass);
+$conn = new mysqli($host, $user, $pass, $db);
 if (!$conn) {
-    echo "Connection failed: " . mysqli_connect_error();
+    die("Connection failed: " . mysqli_connect_error());
 }
