@@ -7,14 +7,277 @@
 
 body {
     background: linear-gradient(135deg, #fef7e8 0%, #fff5e6 100%);
-    padding: 24px;
     min-height: 100vh;
+}
+
+
+/* Non-admin pages get padding */
+
+body:not(:has(.admin-layout)) {
+    padding: 24px;
 }
 
 .app {
     max-width: 1440px;
     margin: 0 auto;
 }
+
+
+/* ── Admin full-screen layout ── */
+
+.admin-layout {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+}
+
+
+/* ── Sidebar ── */
+
+.admin-sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: linear-gradient(175deg, #1a1118 0%, #2b1d27 60%, #3a2232 100%);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.admin-sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 28px 24px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-sidebar-logo span {
+    font-size: 2rem;
+}
+
+.sidebar-brand {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+
+.sidebar-role {
+    font-size: 0.7rem;
+    color: #ff7b2c;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+}
+
+.admin-nav {
+    flex: 1;
+    padding: 20px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.admin-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 500;
+    text-align: left;
+    width: 100%;
+    transition: all 0.18s ease;
+}
+
+.admin-nav-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+    transform: none;
+}
+
+.admin-nav-item.active {
+    background: linear-gradient(90deg, #ff7b2c22 0%, #ff572210 100%);
+    color: #ff7b2c;
+    border-left: 3px solid #ff7b2c;
+    padding-left: 13px;
+    font-weight: 700;
+}
+
+.admin-nav-icon {
+    font-size: 1.1rem;
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.admin-nav-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-footer {
+    padding: 20px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sidebar-user {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0 4px;
+}
+
+
+/* ── Admin main content area ── */
+
+.admin-main {
+    flex: 1;
+    min-width: 0;
+    padding: 36px 40px;
+    overflow-y: auto;
+    background: linear-gradient(135deg, #fef7e8 0%, #fff5e6 100%);
+}
+
+.admin-page-content {
+    max-width: 1100px;
+}
+
+.page-header {
+    margin-bottom: 32px;
+}
+
+.page-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1a1118;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+}
+
+.page-header p {
+    color: #7a6070;
+    font-size: 0.95rem;
+}
+
+
+/* ── Stat cards ── */
+
+.grid-3col {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    border: 1px solid #ffe6d5;
+    border-top: 4px solid var(--accent, #ff7b2c);
+    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.07);
+    transition: box-shadow 0.2s;
+}
+
+.stat-card:hover {
+    box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.12);
+}
+
+.stat-card.big {
+    padding: 32px 36px;
+    border-radius: 24px;
+}
+
+.stat-icon {
+    font-size: 1.8rem;
+    margin-bottom: 12px;
+}
+
+.stat-val {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1a1118;
+    letter-spacing: -0.03em;
+}
+
+.stat-card.big .stat-val {
+    font-size: 2.6rem;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #7a6070;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 4px;
+}
+
+.stat-sub {
+    font-size: 0.8rem;
+    color: #aaa;
+    margin-top: 6px;
+}
+
+
+/* ── Alert banner ── */
+
+.alert-banner {
+    background: #fff3cd;
+    border: 1px solid #f59e0b;
+    border-radius: 12px;
+    padding: 12px 20px;
+    color: #92400e;
+    font-size: 0.88rem;
+    margin-bottom: 20px;
+}
+
+
+/* ── Stock bar ── */
+
+.stock-bar-wrap {
+    background: #f5ede8;
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.stock-bar-fill {
+    height: 8px;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+
+/* ── Inventory badge ── */
+
+.inv-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+
+/* ──────────────────────────────────────────
+   Everything below is original (customer UI + shared)
+   ────────────────────────────────────────── */
 
 .glass-card {
     background: rgba(255, 255, 255, 0.95);
@@ -54,7 +317,6 @@ body {
     margin-left: 8px;
 }
 
-/* ── Admin: plain user-info pill (unchanged) ── */
 .user-info {
     display: flex;
     align-items: center;
@@ -69,7 +331,6 @@ body {
     white-space: nowrap;
 }
 
-/* ── Customer: dropdown wrapper ── */
 .user-dropdown-wrapper {
     position: relative;
     margin-left: auto;
@@ -123,8 +384,14 @@ body {
 }
 
 @keyframes dropIn {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .dropdown-menu.open {
@@ -188,14 +455,18 @@ button:active {
 }
 
 .btn-logout {
-    background: #1e1e2a;
-    color: white;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.82rem;
+    padding: 8px 16px;
+    border-radius: 10px;
 }
 
 .btn-logout:hover {
-    background: #000;
-    transform: translateY(-1px);
+    background: rgba(220, 38, 38, 0.25);
+    color: #fca5a5;
+    transform: none;
 }
 
 .btn-primary {
@@ -236,17 +507,18 @@ button:active {
     background: white;
     border-radius: 2rem;
     padding: 28px 32px;
-    margin-bottom: 32px;
+    margin-bottom: 28px;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
     border: 1px solid #ffe6d5;
 }
 
 .panel h2 {
-    font-size: 1.7rem;
-    margin-bottom: 24px;
-    border-left: 6px solid #ff7b2c;
-    padding-left: 20px;
+    font-size: 1.3rem;
+    margin-bottom: 20px;
+    border-left: 5px solid #ff7b2c;
+    padding-left: 16px;
     font-weight: 700;
+    color: #1a1118;
 }
 
 .grid-2col {
@@ -301,7 +573,7 @@ select:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: white;
+    background: #fffbf5;
     padding: 12px 16px;
     border-radius: 60px;
     margin-bottom: 10px;
@@ -323,6 +595,9 @@ td {
 th {
     color: #ff5722;
     font-weight: 700;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .order-status {
@@ -376,15 +651,8 @@ th {
     background: #1b5e20;
 }
 
-.report-card {
-    background: #fef7ef;
-    border-radius: 1.5rem;
-    padding: 20px;
-    border-left: 5px solid #ff7b2c;
-}
-
 .small-btn {
-    padding: 6px 12px;
+    padding: 6px 14px;
     font-size: 0.75rem;
 }
 
@@ -423,11 +691,40 @@ th {
     font-size: 0.85rem;
 }
 
-@media (max-width: 720px) {
-    body {
+
+/* Customer page padding */
+
+.app:not(:has(.admin-layout)) {
+    padding: 24px;
+}
+
+@media (max-width: 800px) {
+    .admin-layout {
+        flex-direction: column;
+    }
+    .admin-sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    .admin-nav {
+        flex-direction: row;
+        flex-wrap: wrap;
         padding: 12px;
     }
+    .admin-nav-item {
+        flex: 1 1 auto;
+        justify-content: center;
+        font-size: 0.75rem;
+        padding: 10px 8px;
+    }
+    .admin-main {
+        padding: 20px 16px;
+    }
+    body {
+        padding: 0;
+    }
     .panel {
-        padding: 18px;
+        padding: 18px 16px;
     }
 }

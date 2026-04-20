@@ -48,8 +48,10 @@ function addMenuItem(name, price, stock, categoryId) {
     const items = getData(STORAGE_KEYS.menu_items);
     const newId = items.length ? Math.max(...items.map(i => i.itemID)) + 1 : 1;
     const newItem = {
-        itemID: newId, name,
-        price: parseInt(price), stock: parseInt(stock),
+        itemID: newId,
+        name,
+        price: parseInt(price),
+        stock: parseInt(stock),
         category_id: parseInt(categoryId),
         available: stock > 0,
         timeToPrepare: new Date().toISOString()
@@ -62,7 +64,7 @@ function addMenuItem(name, price, stock, categoryId) {
 function updateStock(itemId, newStock) {
     if (newStock < 0) throw new Error('Stock cannot be negative');
     let items = getData(STORAGE_KEYS.menu_items);
-    items = items.map(i => i.itemID === itemId ? { ...i, stock: newStock, available: newStock > 0 } : i);
+    items = items.map(i => i.itemID === itemId ? {...i, stock: newStock, available: newStock > 0 } : i);
     setData(STORAGE_KEYS.menu_items, items);
 }
 
@@ -70,8 +72,10 @@ function createOrder(customerId, totalPayment) {
     const orders = getData(STORAGE_KEYS.orders);
     const newId = orders.length ? Math.max(...orders.map(o => o.OrderID)) + 1 : 1001;
     const newOrder = {
-        OrderID: newId, customer_id: customerId,
-        Status: 'Preparing', TotalPayment: parseInt(totalPayment),
+        OrderID: newId,
+        customer_id: customerId,
+        Status: 'Preparing',
+        TotalPayment: parseInt(totalPayment),
         order_date: new Date().toISOString()
     };
     orders.push(newOrder);
@@ -82,7 +86,7 @@ function createOrder(customerId, totalPayment) {
 function updateOrderStatus(orderId, newStatus) {
     if (!['Preparing', 'Complete', 'Cancelled'].includes(newStatus)) throw new Error('Invalid status');
     let orders = getData(STORAGE_KEYS.orders);
-    orders = orders.map(o => o.OrderID === orderId ? { ...o, Status: newStatus } : o);
+    orders = orders.map(o => o.OrderID === orderId ? {...o, Status: newStatus } : o);
     setData(STORAGE_KEYS.orders, orders);
 }
 
@@ -90,7 +94,8 @@ function createPayment(referenceNumber, orderId, userId) {
     const payments = getData(STORAGE_KEYS.payments);
     const newPayment = {
         referenceNumber: parseInt(referenceNumber),
-        OrderID: orderId, UserID: userId,
+        OrderID: orderId,
+        UserID: userId,
         payment_date: new Date().toISOString()
     };
     payments.push(newPayment);
@@ -179,6 +184,7 @@ function initSampleData() {
 let currentUser = null;
 let customerCart = [];
 let currentPage = 'login';
+let adminPage = 'menu'; // 'menu' | 'inventory' | 'sales-report' | 'orders' | 'sales'
 
 function addToCart(item) {
     const existing = customerCart.find(i => i.ItemID === item.itemID);
@@ -202,9 +208,7 @@ function updateQuantity(itemId, delta) {
     if (idx !== -1) {
         const newQty = customerCart[idx].quantity + delta;
         const maxStock = customerCart[idx].maxStock;
-        if (newQty <= 0) { customerCart.splice(idx, 1); }
-        else if (newQty > maxStock) { alert('Cannot add more than ' + maxStock + ' items'); return; }
-        else { customerCart[idx].quantity = newQty; }
+        if (newQty <= 0) { customerCart.splice(idx, 1); } else if (newQty > maxStock) { alert('Cannot add more than ' + maxStock + ' items'); return; } else { customerCart[idx].quantity = newQty; }
         renderApp();
     }
 }
@@ -230,19 +234,25 @@ function placeOrder() {
 
 function cancelOrder(orderId) {
     if (confirm('Cancel this order?')) {
-        try { updateOrderStatus(orderId, 'Cancelled'); renderApp(); alert('Order cancelled'); }
-        catch (error) { alert(error.message); }
+        try { updateOrderStatus(orderId, 'Cancelled');
+            renderApp();
+            alert('Order cancelled'); } catch (error) { alert(error.message); }
     }
 }
 
 function login(username, password) {
     const user = loginUser(username, password);
-    if (user) { currentUser = user; currentPage = 'login'; return true; }
+    if (user) { currentUser = user;
+        currentPage = 'login'; return true; }
     return false;
 }
 
 function logout() {
-    currentUser = null; customerCart = []; currentPage = 'login'; renderApp();
+    currentUser = null;
+    customerCart = [];
+    currentPage = 'login';
+    adminPage = 'menu';
+    renderApp();
 }
 
 function registerUser(username, password) {
@@ -252,8 +262,14 @@ function registerUser(username, password) {
     } catch (error) { return { success: false, message: error.message }; }
 }
 
-function showRegisterPage() { currentPage = 'register'; renderApp(); }
-function showLoginPage() { currentPage = 'login'; renderApp(); }
+function showRegisterPage() { currentPage = 'register';
+    renderApp(); }
+
+function showLoginPage() { currentPage = 'login';
+    renderApp(); }
+
+function setAdminPage(page) { adminPage = page;
+    renderApp(); }
 
 // ========== RENDER ==========
 function renderLogin() {
@@ -307,68 +323,369 @@ function renderRegister() {
     </div>`;
 }
 
-function renderAdmin() {
-    const menuItems = getData(STORAGE_KEYS.menu_items);
-    const orders = getOrdersWithDetails();
-    const salesReport = getSalesReport('monthly');
-    const lowStock = getLowStockItems(10);
+// ========== ADMIN NAV PAGES ==========
 
+function renderAdminNavBar() {
+    const navItems = [
+        { id: 'menu', icon: '🍕', label: 'Menu & Inventory' },
+        { id: 'inventory', icon: '📦', label: 'Inventory Status' },
+        { id: 'sales-report', icon: '📈', label: 'Sales Report' },
+        { id: 'orders', icon: '📋', label: 'All Orders' },
+        { id: 'sales', icon: '💰', label: 'Sales' },
+    ];
+
+    const navLinksHtml = navItems.map(n =>
+        `<button class="admin-nav-item ${adminPage === n.id ? 'active' : ''}" data-page="${n.id}">
+            <span class="admin-nav-icon">${n.icon}</span>
+            <span class="admin-nav-label">${n.label}</span>
+        </button>`
+    ).join('');
+
+    return `
+    <div class="admin-sidebar">
+        <div class="admin-sidebar-logo">
+            <span>🍽️</span>
+            <div>
+                <div class="sidebar-brand">FoodieDash</div>
+                <div class="sidebar-role">Admin Panel</div>
+            </div>
+        </div>
+        <nav class="admin-nav">
+            ${navLinksHtml}
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">👑 ${currentUser.username}</div>
+            <button class="btn-logout" id="logoutBtn">🚪 Logout</button>
+        </div>
+    </div>`;
+}
+
+function renderPageMenu() {
+    const menuItems = getData(STORAGE_KEYS.menu_items);
     let menuHtml = '';
     for (let i = 0; i < menuItems.length; i++) {
         const item = menuItems[i];
-        const stockStatus = item.stock === 0 ? 'Out of Stock' : (item.stock < 10 ? 'Low Stock (' + item.stock + ')' : 'In Stock (' + item.stock + ')');
-        menuHtml += '<div class="menu-row">' +
-            '<span><strong>' + item.name + '</strong><br><small>$' + (item.price / 100).toFixed(2) + ' | ' + stockStatus + '</small></span>' +
-            '<div><button class="editStockBtn" data-id="' + item.itemID + '" data-stock="' + item.stock + '">Update Stock</button></div>' +
-            '</div>';
+        const stockStatus = item.stock === 0 ? '🔴 Out of Stock' : (item.stock < 10 ? '🟡 Low Stock (' + item.stock + ')' : '🟢 In Stock (' + item.stock + ')');
+        menuHtml += `
+        <div class="menu-row">
+            <span>
+                <strong>${item.name}</strong>
+                <br><small>$${(item.price / 100).toFixed(2)} &nbsp;|&nbsp; ${stockStatus}</small>
+            </span>
+            <div>
+                <button class="editStockBtn btn-secondary small-btn" data-id="${item.itemID}" data-stock="${item.stock}">✏️ Update Stock</button>
+            </div>
+        </div>`;
     }
 
-    let ordersHtml = '';
-    for (let i = 0; i < orders.length; i++) {
-        const order = orders[i];
-        ordersHtml += '<tr>' +
-            '<td>#' + order.OrderID + '</td>' +
-            '<td>' + order.customer_name + '</td>' +
-            '<td>' + new Date(order.order_date).toLocaleString() + '</td>' +
-            '<td>$' + (order.TotalPayment / 100).toFixed(2) + '</td>' +
-            '<td><span class="order-status status-' + order.Status + '">' + order.Status + '</span></td>' +
-            '<td><select class="statusSelect" data-id="' + order.OrderID + '">' +
-            '<option ' + (order.Status === 'Preparing' ? 'selected' : '') + '>Preparing</option>' +
-            '<option ' + (order.Status === 'Complete' ? 'selected' : '') + '>Complete</option>' +
-            '<option ' + (order.Status === 'Cancelled' ? 'selected' : '') + '>Cancelled</option>' +
-            '</select></td>' +
-            '<td>' + (order.referenceNumber || 'N/A') + '</td>' +
-            '</tr>';
-    }
+    return `
+    <div class="admin-page-content">
+        <div class="page-header">
+            <h1>🍕 Menu &amp; Inventory Management</h1>
+            <p>Manage your menu items, prices and stock levels</p>
+        </div>
+        <div class="panel">
+            <h2>Current Menu Items</h2>
+            <div class="item-list">${menuHtml || '<p style="text-align:center;color:#aaa;padding:20px;">No items found.</p>'}</div>
+        </div>
+        <div class="panel">
+            <h2>➕ Add New Item</h2>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+                <div class="form-group" style="flex:2;min-width:160px;margin-bottom:0;">
+                    <label>Item Name</label>
+                    <input type="text" id="newItemName" placeholder="e.g. Garlic Bread">
+                </div>
+                <div class="form-group" style="flex:1;min-width:120px;margin-bottom:0;">
+                    <label>Price (cents)</label>
+                    <input type="number" id="newItemPrice" placeholder="e.g. 499">
+                </div>
+                <div class="form-group" style="flex:1;min-width:100px;margin-bottom:0;">
+                    <label>Stock</label>
+                    <input type="number" id="newItemStock" placeholder="e.g. 50">
+                </div>
+                <button id="addItemBtn" class="btn-primary" style="padding:12px 24px;white-space:nowrap;">Add Item</button>
+            </div>
+        </div>
+    </div>`;
+}
 
-    /* Admin top-bar keeps the original plain pill with logout button */
-    return '<div class="top-bar">' +
-        '<div class="logo">🍽️ FoodieDash <span>Admin</span></div>' +
-        '<div class="user-info">👑 ' + currentUser.username +
-        ' <button class="btn-logout" id="logoutBtn">Logout</button></div>' +
-        '</div>' +
-        '<div class="grid-2col">' +
-        '<div class="card"><h3>📊 Inventory Status</h3>' +
-        (lowStock.length > 0 ? '<div class="stock-warning">⚠️ Low stock: ' + lowStock.map(i => i.name).join(', ') + '</div>' : '<p>All stock levels are good ✅</p>') +
-        '</div>' +
-        '<div class="card"><h3>📈 Sales Report (30 days)</h3>' +
-        '<p>💰 Total Sales: $' + (salesReport.totalSales / 100).toFixed(2) + '</p>' +
-        '<p>📦 Orders Completed: ' + salesReport.orderCount + '</p>' +
-        '<button id="dailyReportBtn" class="btn-secondary small-btn">View Today</button>' +
-        '</div></div>' +
-        '<div class="panel"><h2>🍕 Menu & Inventory Management</h2>' +
-        '<div class="item-list">' + menuHtml + '</div>' +
-        '<div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">' +
-        '<input type="text" id="newItemName" placeholder="New item name" style="flex:1"> ' +
-        '<input type="number" id="newItemPrice" placeholder="Price (cents)" style="width:120px"> ' +
-        '<input type="number" id="newItemStock" placeholder="Stock" style="width:100px"> ' +
-        '<button id="addItemBtn" class="btn-primary">Add Item</button>' +
-        '</div></div>' +
-        '<div class="panel"><h2>📋 All Orders</h2>' +
-        '<div style="overflow-x:auto;">' +
-        '<table><thead><tr><th>ID</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Update</th><th>Payment Ref</th></tr></thead>' +
-        '<tbody>' + ordersHtml + '</tbody></table>' +
-        '</div></div>';
+function renderPageInventory() {
+    const menuItems = getData(STORAGE_KEYS.menu_items);
+    const lowStock = getLowStockItems(10);
+    const outOfStock = menuItems.filter(i => i.stock === 0);
+    const goodStock = menuItems.filter(i => i.stock > 10);
+
+    let rowsHtml = menuItems.map(item => {
+        const pct = Math.min(100, (item.stock / 60) * 100);
+        const barColor = item.stock === 0 ? '#dc2626' : item.stock < 10 ? '#f59e0b' : '#10b981';
+        return `
+        <tr>
+            <td><strong>${item.name}</strong></td>
+            <td>${item.stock}</td>
+            <td>
+                <div class="stock-bar-wrap">
+                    <div class="stock-bar-fill" style="width:${pct}%;background:${barColor};"></div>
+                </div>
+            </td>
+            <td>
+                <span class="inv-badge" style="background:${barColor}20;color:${barColor};">
+                    ${item.stock === 0 ? 'Out of Stock' : item.stock < 10 ? 'Low Stock' : 'Good'}
+                </span>
+            </td>
+            <td><button class="editStockBtn btn-secondary small-btn" data-id="${item.itemID}" data-stock="${item.stock}">Update</button></td>
+        </tr>`;
+    }).join('');
+
+    return `
+    <div class="admin-page-content">
+        <div class="page-header">
+            <h1>📦 Inventory Status</h1>
+            <p>Monitor stock levels across all menu items</p>
+        </div>
+        <div class="grid-3col" style="margin-bottom:28px;">
+            <div class="stat-card" style="--accent:#10b981;">
+                <div class="stat-icon">✅</div>
+                <div class="stat-val">${goodStock.length}</div>
+                <div class="stat-label">Well Stocked</div>
+            </div>
+            <div class="stat-card" style="--accent:#f59e0b;">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-val">${lowStock.length}</div>
+                <div class="stat-label">Low Stock</div>
+            </div>
+            <div class="stat-card" style="--accent:#dc2626;">
+                <div class="stat-icon">🔴</div>
+                <div class="stat-val">${outOfStock.length}</div>
+                <div class="stat-label">Out of Stock</div>
+            </div>
+        </div>
+        ${lowStock.length > 0 ? `<div class="alert-banner">⚠️ <strong>Low stock alert:</strong> ${lowStock.map(i => i.name).join(', ')}</div>` : ''}
+        <div class="panel">
+            <h2>Stock Overview</h2>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead><tr><th>Item</th><th>Qty</th><th style="min-width:160px;">Level</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderPageSalesReport() {
+    const daily = getSalesReport('daily');
+    const monthly = getSalesReport('monthly');
+    const allOrders = getData(STORAGE_KEYS.orders);
+    const completedOrders = allOrders.filter(o => o.Status === 'Complete');
+    const preparingOrders = allOrders.filter(o => o.Status === 'Preparing');
+    const cancelledOrders = allOrders.filter(o => o.Status === 'Cancelled');
+
+    // Revenue by status breakdown
+    const completionRate = allOrders.length ? ((completedOrders.length / allOrders.length) * 100).toFixed(1) : 0;
+
+    return `
+    <div class="admin-page-content">
+        <div class="page-header">
+            <h1>📈 Sales Report</h1>
+            <p>Overview of revenue, orders and performance metrics</p>
+        </div>
+        <div class="grid-2col" style="margin-bottom:28px;">
+            <div class="stat-card big" style="--accent:#ff7b2c;">
+                <div class="stat-icon">☀️</div>
+                <div class="stat-val">$${(daily.totalSales / 100).toFixed(2)}</div>
+                <div class="stat-label">Today's Revenue</div>
+                <div class="stat-sub">${daily.orderCount} orders completed</div>
+            </div>
+            <div class="stat-card big" style="--accent:#ff5722;">
+                <div class="stat-icon">📅</div>
+                <div class="stat-val">$${(monthly.totalSales / 100).toFixed(2)}</div>
+                <div class="stat-label">Monthly Revenue (30 days)</div>
+                <div class="stat-sub">${monthly.orderCount} orders completed</div>
+            </div>
+        </div>
+        <div class="grid-3col" style="margin-bottom:28px;">
+            <div class="stat-card" style="--accent:#10b981;">
+                <div class="stat-icon">✅</div>
+                <div class="stat-val">${completedOrders.length}</div>
+                <div class="stat-label">Completed Orders</div>
+            </div>
+            <div class="stat-card" style="--accent:#f59e0b;">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-val">${preparingOrders.length}</div>
+                <div class="stat-label">In Progress</div>
+            </div>
+            <div class="stat-card" style="--accent:#dc2626;">
+                <div class="stat-icon">❌</div>
+                <div class="stat-val">${cancelledOrders.length}</div>
+                <div class="stat-label">Cancelled</div>
+            </div>
+        </div>
+        <div class="panel">
+            <h2>Performance Summary</h2>
+            <div style="display:flex;flex-direction:column;gap:16px;">
+                <div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-weight:600;">Order Completion Rate</span>
+                        <span style="color:#10b981;font-weight:700;">${completionRate}%</span>
+                    </div>
+                    <div class="stock-bar-wrap" style="height:12px;">
+                        <div class="stock-bar-fill" style="width:${completionRate}%;background:#10b981;height:12px;border-radius:6px;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-weight:600;">Total Orders</span>
+                        <span style="color:#ff5722;font-weight:700;">${allOrders.length}</span>
+                    </div>
+                </div>
+                <div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-weight:600;">Average Order Value (completed)</span>
+                        <span style="font-weight:700;">$${completedOrders.length ? (completedOrders.reduce((s,o) => s + o.TotalPayment, 0) / completedOrders.length / 100).toFixed(2) : '0.00'}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderPageOrders() {
+    const orders = getOrdersWithDetails();
+
+    let ordersHtml = orders.map(order =>
+        `<tr>
+            <td><strong>#${order.OrderID}</strong></td>
+            <td>${order.customer_name}</td>
+            <td>${new Date(order.order_date).toLocaleString()}</td>
+            <td><strong>$${(order.TotalPayment / 100).toFixed(2)}</strong></td>
+            <td><span class="order-status status-${order.Status}">${order.Status}</span></td>
+            <td>
+                <select class="statusSelect" data-id="${order.OrderID}">
+                    <option ${order.Status === 'Preparing' ? 'selected' : ''}>Preparing</option>
+                    <option ${order.Status === 'Complete' ? 'selected' : ''}>Complete</option>
+                    <option ${order.Status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                </select>
+            </td>
+            <td>${order.referenceNumber || 'N/A'}</td>
+        </tr>`
+    ).join('');
+
+    return `
+    <div class="admin-page-content">
+        <div class="page-header">
+            <h1>📋 All Orders</h1>
+            <p>View and manage all customer orders</p>
+        </div>
+        <div class="panel">
+            <h2>Order Management</h2>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Customer</th><th>Date</th><th>Total</th>
+                            <th>Status</th><th>Update Status</th><th>Payment Ref</th>
+                        </tr>
+                    </thead>
+                    <tbody>${ordersHtml || '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:24px;">No orders yet.</td></tr>'}</tbody>
+                </table>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderPageSales() {
+    const orders = getOrdersWithDetails();
+    const completedOrders = orders.filter(o => o.Status === 'Complete');
+
+    // Group by date
+    const byDate = {};
+    completedOrders.forEach(o => {
+        const d = new Date(o.order_date).toLocaleDateString();
+        if (!byDate[d]) byDate[d] = { count: 0, revenue: 0 };
+        byDate[d].count++;
+        byDate[d].revenue += o.TotalPayment;
+    });
+
+    const dateRows = Object.entries(byDate)
+        .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+        .map(([date, data]) =>
+            `<tr>
+                <td>${date}</td>
+                <td>${data.count}</td>
+                <td><strong style="color:#ff5722;">$${(data.revenue / 100).toFixed(2)}</strong></td>
+            </tr>`
+        ).join('');
+
+    const totalRevenue = completedOrders.reduce((s, o) => s + o.TotalPayment, 0);
+
+    // Per-customer breakdown
+    const byCustomer = {};
+    completedOrders.forEach(o => {
+        if (!byCustomer[o.customer_name]) byCustomer[o.customer_name] = { count: 0, revenue: 0 };
+        byCustomer[o.customer_name].count++;
+        byCustomer[o.customer_name].revenue += o.TotalPayment;
+    });
+
+    const customerRows = Object.entries(byCustomer)
+        .sort((a, b) => b[1].revenue - a[1].revenue)
+        .map(([name, data]) =>
+            `<tr>
+                <td>👤 ${name}</td>
+                <td>${data.count} orders</td>
+                <td><strong style="color:#ff5722;">$${(data.revenue / 100).toFixed(2)}</strong></td>
+            </tr>`
+        ).join('');
+
+    return `
+    <div class="admin-page-content">
+        <div class="page-header">
+            <h1>💰 Sales</h1>
+            <p>Detailed sales breakdown by date and customer</p>
+        </div>
+        <div class="stat-card big" style="--accent:#ff5722;margin-bottom:28px;">
+            <div class="stat-icon">💰</div>
+            <div class="stat-val">$${(totalRevenue / 100).toFixed(2)}</div>
+            <div class="stat-label">Total Revenue (All Time)</div>
+            <div class="stat-sub">From ${completedOrders.length} completed orders</div>
+        </div>
+        <div class="grid-2col">
+            <div class="panel" style="margin-bottom:0;">
+                <h2>📅 Sales by Date</h2>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead><tr><th>Date</th><th>Orders</th><th>Revenue</th></tr></thead>
+                        <tbody>${dateRows || '<tr><td colspan="3" style="text-align:center;color:#aaa;padding:20px;">No sales data yet.</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0;">
+                <h2>👥 Sales by Customer</h2>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead><tr><th>Customer</th><th>Orders</th><th>Total Spent</th></tr></thead>
+                        <tbody>${customerRows || '<tr><td colspan="3" style="text-align:center;color:#aaa;padding:20px;">No customer data yet.</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderAdmin() {
+    let pageContent = '';
+    if (adminPage === 'menu')         pageContent = renderPageMenu();
+    else if (adminPage === 'inventory')    pageContent = renderPageInventory();
+    else if (adminPage === 'sales-report') pageContent = renderPageSalesReport();
+    else if (adminPage === 'orders')       pageContent = renderPageOrders();
+    else if (adminPage === 'sales')        pageContent = renderPageSales();
+
+    return `
+    <div class="admin-layout">
+        ${renderAdminNavBar()}
+        <main class="admin-main">
+            ${pageContent}
+        </main>
+    </div>`;
 }
 
 function renderCustomer() {
@@ -415,11 +732,8 @@ function renderCustomer() {
             '</tr>';
     }
 
-    /* Customer top-bar uses the dropdown instead of plain logout button */
     return '<div class="top-bar">' +
         '<div class="logo">🍔 FoodieDash <span>Customer</span></div>' +
-
-        /* ── DROPDOWN (customer only) ── */
         '<div class="user-dropdown-wrapper">' +
             '<button class="user-dropdown-btn" id="userDropdownBtn">' +
                 '🧑 ' + currentUser.username +
@@ -431,7 +745,6 @@ function renderCustomer() {
                 '<button class="dropdown-item danger" id="logoutBtn">🚪&nbsp; Logout</button>' +
             '</div>' +
         '</div>' +
-
         '</div>' +
         '<div class="grid-2col">' +
         '<div class="card"><h3>📜 Our Menu</h3>' +
@@ -455,6 +768,14 @@ function attachEvents() {
     if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
     if (currentUser && currentUser.role === 'admin') {
+        // Nav items
+        document.querySelectorAll('.admin-nav-item').forEach(btn => {
+            btn.addEventListener('click', function() {
+                setAdminPage(this.dataset.page);
+            });
+        });
+
+        // Page-specific events
         document.querySelectorAll('.editStockBtn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const id = parseInt(this.dataset.id);
@@ -485,19 +806,9 @@ function attachEvents() {
                 catch (e) { alert(e.message); }
             });
         });
-
-        const dailyBtn = document.getElementById('dailyReportBtn');
-        if (dailyBtn) {
-            dailyBtn.addEventListener('click', function() {
-                const daily = getSalesReport('daily');
-                alert('Today\'s Sales: $' + (daily.totalSales / 100).toFixed(2) + ' | Orders: ' + daily.orderCount);
-            });
-        }
     }
 
     if (currentUser && currentUser.role === 'customer') {
-
-        /* ── Dropdown toggle ── */
         const dropdownBtn  = document.getElementById('userDropdownBtn');
         const dropdownMenu = document.getElementById('dropdownMenu');
         const dropdownArrow = document.getElementById('dropdownArrow');
@@ -508,15 +819,12 @@ function attachEvents() {
                 const isOpen = dropdownMenu.classList.toggle('open');
                 if (dropdownArrow) dropdownArrow.classList.toggle('open', isOpen);
             });
-
-            /* Close when clicking anywhere outside */
             document.addEventListener('click', function closeDD() {
                 dropdownMenu.classList.remove('open');
                 if (dropdownArrow) dropdownArrow.classList.remove('open');
             });
         }
 
-        /* ── Scroll to Order History ── */
         const viewOrdersBtn = document.getElementById('viewOrdersDropBtn');
         if (viewOrdersBtn) {
             viewOrdersBtn.addEventListener('click', function() {
@@ -527,7 +835,6 @@ function attachEvents() {
             });
         }
 
-        /* ── Add to cart ── */
         document.querySelectorAll('.addToCartBtn').forEach(btn => {
             btn.addEventListener('click', function() {
                 addToCart({
