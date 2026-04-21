@@ -36,6 +36,38 @@ function respondError($msg, $code = 400) {
     exit;
 }
 
+function castRow($row, $intFields = []) {
+    foreach ($intFields as $field) {
+        if (isset($row[$field])) {
+            $row[$field] = (int)$row[$field];
+        }
+    }
+    return $row;
+}
+
+function validatePassword($password) {
+    if (!preg_match('/[A-Z]/', $password))
+        respondError('Password must contain at least one uppercase letter.');
+    if (!preg_match('/[!@#$%^&*()\[\],.?":{}|<>]/', $password))
+        respondError('Password must contain at least one special character.');
+}
+
+function checkUsernameExists($conn, $username) {
+    $tables = ['customers' => 'customerID', 'users' => 'userID'];
+    foreach ($tables as $table => $idField) {
+        $chk = $conn->prepare("SELECT $idField FROM $table WHERE username = ?");
+        $chk->bind_param('s', $username);
+        $chk->execute();
+        $chk->store_result();
+        if ($chk->num_rows > 0) {
+            $chk->close();
+            return true;
+        }
+        $chk->close();
+    }
+    return false;
+}
+
 // Read raw JSON body (used for POST requests)
 $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
@@ -92,26 +124,9 @@ switch ($action) {
 
         if (!$username || !$password) respondError('Username and password are required.');
 
-        // Password validation
-        if (!preg_match('/[A-Z]/', $password))
-            respondError('Password must contain at least one uppercase letter.');
-        if (!preg_match('/[!@#$%^&*()\[\],.?":{}|<>]/', $password))
-            respondError('Password must contain at least one special character.');
+        validatePassword($password);
 
-        // Check duplicate in both tables
-        $chk = $conn->prepare("SELECT customerID FROM customers WHERE username = ?");
-        $chk->bind_param('s', $username);
-        $chk->execute();
-        $chk->store_result();
-        if ($chk->num_rows > 0) respondError('Username already exists.');
-        $chk->close();
-
-        $chk2 = $conn->prepare("SELECT userID FROM users WHERE username = ?");
-        $chk2->bind_param('s', $username);
-        $chk2->execute();
-        $chk2->store_result();
-        if ($chk2->num_rows > 0) respondError('Username already exists.');
-        $chk2->close();
+        if (checkUsernameExists($conn, $username)) respondError('Username already exists.');
 
         $stmt = $conn->prepare("INSERT INTO customers (username, password) VALUES (?, ?)");
         $stmt->bind_param('ss', $username, $password);
@@ -148,12 +163,8 @@ switch ($action) {
         );
         $items = [];
         while ($row = $result->fetch_assoc()) {
-            $row['itemID']     = (int)$row['itemID'];
-            $row['price']      = (int)$row['price'];
-            $row['stock']      = (int)$row['stock'];
-            $row['available']  = (bool)$row['available'];
-            $row['categoryID'] = (int)$row['categoryID'];
-            $items[] = $row;
+            $items[] = castRow($row, ['itemID', 'price', 'stock', 'categoryID']);
+            $items[count($items)-1]['available'] = (bool)$items[count($items)-1]['available'];
         }
         respond($items);
     }
@@ -231,11 +242,8 @@ switch ($action) {
         $result = $conn->query($sql);
         $orders = [];
         while ($row = $result->fetch_assoc()) {
-            $row['OrderID']         = (int)$row['OrderID'];
-            $row['TotalPayment']    = (int)$row['TotalPayment'];
-            $row['customer_id']     = isset($row['customer_id']) ? (int)$row['customer_id'] : null;
-            $row['referenceNumber'] = isset($row['referenceNumber']) ? (int)$row['referenceNumber'] : null;
-            $row['order_date']      = $row['order_date'] ?? date('Y-m-d H:i:s');
+            $row = castRow($row, ['OrderID', 'TotalPayment', 'customer_id', 'referenceNumber']);
+            $row['order_date'] = $row['order_date'] ?? date('Y-m-d H:i:s');
             $orders[] = $row;
         }
         respond($orders);
@@ -386,9 +394,7 @@ switch ($action) {
         );
         $rows = [];
         while ($row = $result->fetch_assoc()) {
-            $row['order_count'] = (int)$row['order_count'];
-            $row['revenue']     = (int)$row['revenue'];
-            $rows[] = $row;
+            $rows[] = castRow($row, ['order_count', 'revenue']);
         }
         respond($rows);
     }
@@ -407,9 +413,7 @@ switch ($action) {
         );
         $rows = [];
         while ($row = $result->fetch_assoc()) {
-            $row['order_count'] = (int)$row['order_count'];
-            $row['revenue']     = (int)$row['revenue'];
-            $rows[] = $row;
+            $rows[] = castRow($row, ['order_count', 'revenue']);
         }
         respond($rows);
     }
@@ -421,8 +425,7 @@ switch ($action) {
         $result = $conn->query("SELECT categoryID, name FROM categories ORDER BY categoryID");
         $cats = [];
         while ($row = $result->fetch_assoc()) {
-            $row['categoryID'] = (int)$row['categoryID'];
-            $cats[] = $row;
+            $cats[] = castRow($row, ['categoryID']);
         }
         respond($cats);
     }
