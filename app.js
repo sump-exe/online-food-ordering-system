@@ -35,11 +35,12 @@ let currentPage  = 'login';   // 'login' | 'register'
 let adminPage    = 'menu';    // 'menu' | 'inventory' | 'sales-report' | 'orders' | 'sales'
 
 // In-memory cache (refreshed on each renderApp call)
-let _menuItems  = [];
-let _orders     = [];
-let _orderStats = { Preparing: 0, Complete: 0, Cancelled: 0 };
-let _dailySales = { totalSales: 0, orderCount: 0 };
-let _monthlySales = { totalSales: 0, orderCount: 0 };
+let _menuItems       = [];
+let _categories      = [];
+let _orders          = [];
+let _orderStats      = { Preparing: 0, Complete: 0, Cancelled: 0 };
+let _dailySales      = { totalSales: 0, orderCount: 0 };
+let _monthlySales    = { totalSales: 0, orderCount: 0 };
 let _salesByDate     = [];
 let _salesByCustomer = [];
 
@@ -49,6 +50,10 @@ let _salesByCustomer = [];
 
 async function loadMenuItems() {
     _menuItems = await apiGet('getMenuItems');
+}
+
+async function loadCategories() {
+    _categories = await apiGet('getCategories');
 }
 
 async function loadOrders(customerId = null) {
@@ -120,9 +125,9 @@ function removeFromCart(itemId) {
 function updateQuantity(itemId, delta) {
     const idx = customerCart.findIndex(i => i.ItemID === itemId);
     if (idx !== -1) {
-        const newQty     = customerCart[idx].quantity + delta;
-        const maxStock   = customerCart[idx].maxStock;
-        if (newQty <= 0)           { customerCart.splice(idx, 1); }
+        const newQty   = customerCart[idx].quantity + delta;
+        const maxStock = customerCart[idx].maxStock;
+        if (newQty <= 0)            { customerCart.splice(idx, 1); }
         else if (newQty > maxStock) { alert('Cannot add more than ' + maxStock + ' items'); return; }
         else                        { customerCart[idx].quantity = newQty; }
         renderApp();
@@ -286,17 +291,23 @@ function renderPageMenu() {
             : item.stock < 10
                 ? '🟡 Low Stock (' + item.stock + ')'
                 : '🟢 In Stock (' + item.stock + ')';
+        const catName = item.category_name || 'Uncategorised';
         menuHtml += `
         <div class="menu-row">
             <span>
                 <strong>${item.name}</strong>
-                <br><small>₱${(item.price / 100).toFixed(2)} &nbsp;|&nbsp; ${stockStatus}</small>
+                <br><small>₱${(item.price / 100).toFixed(2)} &nbsp;|&nbsp; ${catName} &nbsp;|&nbsp; ${stockStatus}</small>
             </span>
             <div>
                 <button class="editStockBtn btn-secondary small-btn" data-id="${item.itemID}" data-stock="${item.stock}">✏️ Update Stock</button>
             </div>
         </div>`;
     }
+
+    // Build category options from loaded _categories
+    const catOptions = _categories.map(c =>
+        `<option value="${c.categoryID}">${c.name}</option>`
+    ).join('');
 
     return `
     <div class="admin-page-content">
@@ -323,6 +334,10 @@ function renderPageMenu() {
                     <label>Stock</label>
                     <input type="number" id="newItemStock" placeholder="e.g. 50">
                 </div>
+                <div class="form-group" style="flex:1;min-width:120px;margin-bottom:0;">
+                    <label>Category</label>
+                    <select id="newItemCategory">${catOptions}</select>
+                </div>
                 <button id="addItemBtn" class="btn-primary" style="padding:12px 24px;white-space:nowrap;">Add Item</button>
             </div>
         </div>
@@ -340,6 +355,7 @@ function renderPageInventory() {
         return `
         <tr>
             <td><strong>${item.name}</strong></td>
+            <td>${item.category_name || '—'}</td>
             <td>${item.stock}</td>
             <td>
                 <div class="stock-bar-wrap">
@@ -383,7 +399,7 @@ function renderPageInventory() {
             <h2>Stock Overview</h2>
             <div style="overflow-x:auto;">
                 <table>
-                    <thead><tr><th>Item</th><th>Qty</th><th style="min-width:160px;">Level</th><th>Status</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Item</th><th>Category</th><th>Qty</th><th style="min-width:160px;">Level</th><th>Status</th><th>Action</th></tr></thead>
                     <tbody>${rowsHtml}</tbody>
                 </table>
             </div>
@@ -500,7 +516,7 @@ function renderPageOrders() {
 }
 
 function renderPageSales() {
-    const totalRevenue = _salesByDate.reduce((s, r) => s + r.revenue, 0);
+    const totalRevenue    = _salesByDate.reduce((s, r) => s + r.revenue, 0);
     const totalOrderCount = _salesByDate.reduce((s, r) => s + r.order_count, 0);
 
     const dateRows = _salesByDate.map(r =>
@@ -570,16 +586,23 @@ function renderAdmin() {
 }
 
 function renderCustomer() {
-    const availableItems = _menuItems.filter(i => i.stock > 0);
-    const myOrders = _orders; // already filtered by customerId
-    const cartTotal = getCartTotal();
+    // Group menu items by category
+    const categoryMap = {};
+    for (const item of _menuItems.filter(i => i.stock > 0)) {
+        const cat = item.category_name || 'Other';
+        if (!categoryMap[cat]) categoryMap[cat] = [];
+        categoryMap[cat].push(item);
+    }
 
     let menuHtml = '';
-    for (const item of availableItems) {
-        menuHtml += '<div class="menu-row">' +
-            '<span><strong>' + item.name + '</strong><br><small>₱' + (item.price / 100).toFixed(2) + ' | Stock: ' + item.stock + '</small></span>' +
-            '<button class="addToCartBtn" data-id="' + item.itemID + '" data-name="' + item.name + '" data-price="' + item.price + '" data-stock="' + item.stock + '">Add to Cart</button>' +
-            '</div>';
+    for (const [catName, items] of Object.entries(categoryMap)) {
+        menuHtml += `<div style="margin-bottom:12px;"><strong style="color:#ff5722;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;">🏷️ ${catName}</strong></div>`;
+        for (const item of items) {
+            menuHtml += '<div class="menu-row">' +
+                '<span><strong>' + item.name + '</strong><br><small>₱' + (item.price / 100).toFixed(2) + ' | Stock: ' + item.stock + '</small></span>' +
+                '<button class="addToCartBtn" data-id="' + item.itemID + '" data-name="' + item.name + '" data-price="' + item.price + '" data-stock="' + item.stock + '">Add to Cart</button>' +
+                '</div>';
+        }
     }
 
     let cartHtml = '';
@@ -598,7 +621,7 @@ function renderCustomer() {
     }
 
     let ordersHtml = '';
-    for (const order of myOrders) {
+    for (const order of _orders) {
         ordersHtml += '<tr>' +
             '<td>#' + order.OrderID + '</td>' +
             '<td>' + (order.order_date ? new Date(order.order_date).toLocaleString() : '—') + '</td>' +
@@ -631,7 +654,7 @@ function renderCustomer() {
         '</div>' +
         '<div class="card"><h3>🛒 Your Cart</h3>' +
         '<div>' + cartHtml + '</div>' +
-        '<div class="total">Total: ₱' + (cartTotal / 100).toFixed(2) + '</div>' +
+        '<div class="total">Total: ₱' + (getCartTotal() / 100).toFixed(2) + '</div>' +
         '<button id="placeOrderBtn" class="btn-order">✅ Place Order</button>' +
         '</div></div>' +
         '<div class="panel" id="orderHistoryPanel"><h2>📜 My Order History</h2>' +
@@ -669,11 +692,12 @@ function attachEvents() {
         const addBtn = document.getElementById('addItemBtn');
         if (addBtn) {
             addBtn.addEventListener('click', function () {
-                const name  = document.getElementById('newItemName').value.trim();
-                const price = parseInt(document.getElementById('newItemPrice').value);
-                const stock = parseInt(document.getElementById('newItemStock').value);
+                const name       = document.getElementById('newItemName').value.trim();
+                const price      = parseInt(document.getElementById('newItemPrice').value);
+                const stock      = parseInt(document.getElementById('newItemStock').value);
+                const categoryID = parseInt(document.getElementById('newItemCategory').value);
                 if (!name || isNaN(price) || isNaN(stock)) { alert('Please fill all fields'); return; }
-                apiPost('addMenuItem', { name, price, stock, category_id: 1 })
+                apiPost('addMenuItem', { name, price, stock, categoryID })
                     .then(() => renderApp())
                     .catch(e => alert(e.message));
             });
@@ -759,8 +783,8 @@ async function renderApp() {
             root.innerHTML = renderLogin();
 
             document.getElementById('doLoginBtn').addEventListener('click', async function () {
-                const uname = document.getElementById('loginUsername').value;
-                const pwd   = document.getElementById('loginPassword').value;
+                const uname  = document.getElementById('loginUsername').value;
+                const pwd    = document.getElementById('loginPassword').value;
                 const msgDiv = document.getElementById('loginMessage');
                 try {
                     const ok = await login(uname, pwd);
@@ -775,7 +799,6 @@ async function renderApp() {
                 }
             });
 
-            // Allow pressing Enter to login
             ['loginUsername', 'loginPassword'].forEach(id => {
                 document.getElementById(id).addEventListener('keydown', e => {
                     if (e.key === 'Enter') document.getElementById('doLoginBtn').click();
@@ -824,7 +847,7 @@ async function renderApp() {
     if (currentUser.role === 'admin') {
         root.innerHTML = '<div style="text-align:center;padding:60px;color:#999;">Loading admin data…</div>';
         try {
-            await Promise.all([loadMenuItems(), loadOrders(), loadAdminExtras()]);
+            await Promise.all([loadMenuItems(), loadCategories(), loadOrders(), loadAdminExtras()]);
         } catch (e) {
             root.innerHTML = '<div class="error-message" style="margin:40px auto;max-width:500px;">❌ Failed to load data: ' + e.message + '</div>';
             return;
@@ -849,13 +872,6 @@ async function renderApp() {
 }
 
 // ============================================================
-//  BOOT – seed DB on first visit, then render
+//  BOOT
 // ============================================================
-(async () => {
-    try {
-        await apiGet('initSampleData');
-    } catch (e) {
-        console.warn('initSampleData skipped:', e.message);
-    }
-    renderApp();
-})();
+renderApp();
