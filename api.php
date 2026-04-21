@@ -45,6 +45,20 @@ function castRow($row, $intFields = []) {
     return $row;
 }
 
+function fetchAllRows($result, $intFields = [], $boolFields = []) {
+    $rows = [];
+    while ($row = $result->fetch_assoc()) {
+        $row = castRow($row, $intFields);
+        foreach ($boolFields as $field) {
+            if (isset($row[$field])) {
+                $row[$field] = (bool)$row[$field];
+            }
+        }
+        $rows[] = $row;
+    }
+    return $rows;
+}
+
 function validatePassword($password) {
     if (!preg_match('/[A-Z]/', $password))
         respondError('Password must contain at least one uppercase letter.');
@@ -68,6 +82,29 @@ function checkUsernameExists($conn, $username) {
     return false;
 }
 
+function findAccount($conn, $table, $idField, $role, $username, $password) {
+    $stmt = $conn->prepare(
+        "SELECT $idField AS id, username, ? AS role FROM $table WHERE username = ? AND password = ?"
+    );
+    $stmt->bind_param('sss', $role, $username, $password);
+    $stmt->execute();
+    $account = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $account ?: null;
+}
+
+function executePrepared($stmt, $errorMessage) {
+    if (!$stmt->execute()) {
+        $message = $errorMessage . ': ' . $stmt->error;
+        $stmt->close();
+        respondError($message);
+    }
+}
+
+function respondSuccess() {
+    respond(['success' => true]);
+}
+
 // Read raw JSON body (used for POST requests)
 $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
@@ -85,26 +122,9 @@ switch ($action) {
         $username = $_GET['username'] ?? '';
         $password = $_GET['password'] ?? '';
 
-        // Check admins (users table) first
-        $stmt = $conn->prepare(
-            "SELECT userID AS id, username, 'admin' AS role FROM users WHERE username = ? AND password = ?"
-        );
-        $stmt->bind_param('ss', $username, $password);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $account = $result->fetch_assoc();
-        $stmt->close();
-
-        // If not admin, check customers table
+        $account = findAccount($conn, 'users', 'userID', 'admin', $username, $password);
         if (!$account) {
-            $stmt = $conn->prepare(
-                "SELECT customerID AS id, username, 'customer' AS role FROM customers WHERE username = ? AND password = ?"
-            );
-            $stmt->bind_param('ss', $username, $password);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $account = $result->fetch_assoc();
-            $stmt->close();
+            $account = findAccount($conn, 'customers', 'customerID', 'customer', $username, $password);
         }
 
         if (!$account) respond(['user' => null]);
@@ -130,7 +150,7 @@ switch ($action) {
 
         $stmt = $conn->prepare("INSERT INTO customers (username, password) VALUES (?, ?)");
         $stmt->bind_param('ss', $username, $password);
-        if (!$stmt->execute()) respondError('Registration failed: ' . $stmt->error);
+        executePrepared($stmt, 'Registration failed');
         $newId = $stmt->insert_id;
         $stmt->close();
 
@@ -161,12 +181,7 @@ switch ($action) {
              LEFT JOIN categories c ON c.categoryID = m.categoryID
              ORDER BY m.itemID"
         );
-        $items = [];
-        while ($row = $result->fetch_assoc()) {
-            $items[] = castRow($row, ['itemID', 'price', 'stock', 'categoryID']);
-            $items[count($items)-1]['available'] = (bool)$items[count($items)-1]['available'];
-        }
-        respond($items);
+        respond(fetchAllRows($result, ['itemID', 'price', 'stock', 'categoryID'], ['available']));
     }
 
     // POST api.php?action=addMenuItem
@@ -185,7 +200,7 @@ switch ($action) {
             "INSERT INTO menu_items (name, price, stock, categoryID, timeToPrepare) VALUES (?, ?, ?, ?, NOW())"
         );
         $stmt->bind_param('siii', $name, $price, $stock, $categoryID);
-        if (!$stmt->execute()) respondError('Failed to add item: ' . $stmt->error);
+        executePrepared($stmt, 'Failed to add item');
         $newId = $stmt->insert_id;
         $stmt->close();
 
@@ -209,10 +224,10 @@ switch ($action) {
 
         $stmt = $conn->prepare("UPDATE menu_items SET stock = ? WHERE itemID = ?");
         $stmt->bind_param('ii', $newStock, $itemId);
-        if (!$stmt->execute()) respondError('Failed to update stock: ' . $stmt->error);
+        executePrepared($stmt, 'Failed to update stock');
         $stmt->close();
 
-        respond(['success' => true]);
+        respondSuccess();
     }
 
     // ── ORDERS ──────────────────────────────────────────────
@@ -240,12 +255,11 @@ switch ($action) {
         $sql .= " ORDER BY o.OrderID DESC";
 
         $result = $conn->query($sql);
-        $orders = [];
-        while ($row = $result->fetch_assoc()) {
-            $row = castRow($row, ['OrderID', 'TotalPayment', 'customer_id', 'referenceNumber']);
-            $row['order_date'] = $row['order_date'] ?? date('Y-m-d H:i:s');
-            $orders[] = $row;
+        $orders = fetchAllRows($result, ['OrderID', 'TotalPayment', 'customer_id', 'referenceNumber']);
+        foreach ($orders as &$order) {
+            $order['order_date'] = $order['order_date'] ?? date('Y-m-d H:i:s');
         }
+        unset($order);
         respond($orders);
     }
 
@@ -338,10 +352,10 @@ switch ($action) {
 
         $stmt = $conn->prepare("UPDATE orders SET Status = ? WHERE OrderID = ?");
         $stmt->bind_param('si', $newStatus, $orderId);
-        if (!$stmt->execute()) respondError('Failed to update status: ' . $stmt->error);
+        executePrepared($stmt, 'Failed to update status');
         $stmt->close();
 
-        respond(['success' => true]);
+        respondSuccess();
     }
 
     // ── SALES / REPORTS ─────────────────────────────────────
@@ -392,11 +406,7 @@ switch ($action) {
              ORDER BY sale_date DESC
              LIMIT 30"
         );
-        $rows = [];
-        while ($row = $result->fetch_assoc()) {
-            $rows[] = castRow($row, ['order_count', 'revenue']);
-        }
-        respond($rows);
+        respond(fetchAllRows($result, ['order_count', 'revenue']));
     }
 
     // GET api.php?action=getSalesByCustomer
@@ -411,11 +421,7 @@ switch ($action) {
              GROUP BY c.username
              ORDER BY revenue DESC"
         );
-        $rows = [];
-        while ($row = $result->fetch_assoc()) {
-            $rows[] = castRow($row, ['order_count', 'revenue']);
-        }
-        respond($rows);
+        respond(fetchAllRows($result, ['order_count', 'revenue']));
     }
 
     // ── CATEGORIES ──────────────────────────────────────────
@@ -423,11 +429,7 @@ switch ($action) {
     // GET api.php?action=getCategories
     case 'getCategories': {
         $result = $conn->query("SELECT categoryID, name FROM categories ORDER BY categoryID");
-        $cats = [];
-        while ($row = $result->fetch_assoc()) {
-            $cats[] = castRow($row, ['categoryID']);
-        }
-        respond($cats);
+        respond(fetchAllRows($result, ['categoryID']));
     }
 
     default:

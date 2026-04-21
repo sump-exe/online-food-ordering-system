@@ -5,15 +5,20 @@
     font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
-body {
+body,
+.admin-main {
     background: linear-gradient(135deg, #fef7e8 0%, #fff5e6 100%);
+}
+
+body {
     min-height: 100vh;
 }
 
 
 /* Non-admin pages get padding */
 
-body:not(:has(.admin-layout)) {
+body:not(:has(.admin-layout)),
+.app:not(:has(.admin-layout)) {
     padding: 24px;
 }
 
@@ -151,7 +156,6 @@ body:not(:has(.admin-layout)) {
     min-width: 0;
     padding: 36px 40px;
     overflow-y: auto;
-    background: linear-gradient(135deg, #fef7e8 0%, #fff5e6 100%);
 }
 
 .admin-page-content {
@@ -454,6 +458,44 @@ button:active {
     transform: scale(0.97);
 }
 
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-success,
+.btn-order {
+    color: white;
+}
+
+.btn-primary {
+    background: #ff7b2c;
+    box-shadow: 0 4px 10px rgba(255, 87, 34, 0.3);
+}
+
+.btn-primary:hover {
+    background: #ff5722;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: #2d2a24;
+}
+
+.btn-danger {
+    background: #dc2626;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+}
+
+.btn-success {
+    background: #10b981;
+}
+
+.btn-success:hover {
+    background: #059669;
+}
+
 .btn-logout {
     background: rgba(255, 255, 255, 0.12);
     color: rgba(255, 255, 255, 0.85);
@@ -466,41 +508,6 @@ button:active {
 .btn-logout:hover {
     background: rgba(220, 38, 38, 0.25);
     color: #fca5a5;
-    transform: none;
-}
-
-.btn-primary {
-    background: #ff7b2c;
-    color: white;
-    box-shadow: 0 4px 10px rgba(255, 87, 34, 0.3);
-}
-
-.btn-primary:hover {
-    background: #ff5722;
-    transform: translateY(-1px);
-}
-
-.btn-secondary {
-    background: #2d2a24;
-    color: white;
-}
-
-.btn-danger {
-    background: #dc2626;
-    color: white;
-}
-
-.btn-danger:hover {
-    background: #b91c1c;
-}
-
-.btn-success {
-    background: #10b981;
-    color: white;
-}
-
-.btn-success:hover {
-    background: #059669;
 }
 
 .panel {
@@ -608,6 +615,12 @@ th {
     display: inline-block;
 }
 
+.status-Preparing,
+.status-Complete,
+.status-Cancelled {
+    display: inline-block;
+}
+
 .status-Preparing {
     background: #ffe3c9;
     color: #ff5722;
@@ -644,7 +657,6 @@ th {
     width: 100%;
     margin-top: 20px;
     font-size: 1rem;
-    color: white;
 }
 
 .btn-order:hover {
@@ -673,30 +685,24 @@ th {
     text-decoration: underline;
 }
 
-.error-message {
-    background: #fee2e2;
-    color: #991b1b;
+.error-message,
+.success-message {
     padding: 10px;
     border-radius: 10px;
     margin-bottom: 15px;
     font-size: 0.85rem;
+}
+
+.error-message {
+    background: #fee2e2;
+    color: #991b1b;
 }
 
 .success-message {
     background: #d1fae5;
     color: #065f46;
-    padding: 10px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    font-size: 0.85rem;
 }
 
-
-/* Customer page padding */
-
-.app:not(:has(.admin-layout)) {
-    padding: 24px;
-}
 
 @media (max-width: 800px) {
     .admin-layout {
