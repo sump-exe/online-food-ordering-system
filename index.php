@@ -4,6 +4,8 @@
 //  Place in C:/xampp/htdocs/your-folder/
 // ============================================================
 
+// this is what will run when you open the file in localhost
+
 $host = '127.0.0.1';
 $user = 'root';
 $pass = '';
