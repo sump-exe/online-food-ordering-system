@@ -33,6 +33,7 @@ let currentUser  = null;
 let customerCart = [];
 let currentPage  = 'login';   // 'login' | 'register'
 let adminPage    = 'menu';    // 'menu' | 'inventory' | 'sales-report' | 'orders' | 'sales'
+let _firstLoad   = true;      // true until first successful data load
 
 // In-memory cache (refreshed on each renderApp call)
 let _menuItems       = [];
@@ -89,6 +90,7 @@ function logout() {
     customerCart = [];
     currentPage  = 'login';
     adminPage    = 'menu';
+    _firstLoad   = true;
     renderApp();
 }
 
@@ -114,12 +116,12 @@ function addToCart(item) {
         if (item.stock === 0) { alert('Item is out of stock!'); return; }
         customerCart.push({ ItemID: item.itemID, name: item.name, price: item.price, quantity: 1, maxStock: item.stock });
     }
-    renderApp();
+    renderInPlace(); // cart-only change — no fetch needed
 }
 
 function removeFromCart(itemId) {
     customerCart = customerCart.filter(i => i.ItemID !== itemId);
-    renderApp();
+    renderInPlace();
 }
 
 function updateQuantity(itemId, delta) {
@@ -130,7 +132,7 @@ function updateQuantity(itemId, delta) {
         if (newQty <= 0)            { customerCart.splice(idx, 1); }
         else if (newQty > maxStock) { alert('Cannot add more than ' + maxStock + ' items'); return; }
         else                        { customerCart[idx].quantity = newQty; }
-        renderApp();
+        renderInPlace();
     }
 }
 
@@ -163,7 +165,7 @@ async function placeOrder() {
             'Total: ₱' + (totalAmount / 100).toFixed(2) + '\n' +
             'Payment Reference: ' + result.referenceNumber
         );
-        renderApp();
+        await renderApp(); // need fresh order list from DB
     } catch (e) { alert('Error: ' + e.message); }
 }
 
@@ -172,7 +174,7 @@ async function cancelOrder(orderId) {
     try {
         await apiPost('updateOrderStatus', { orderId, status: 'Cancelled' });
         alert('Order cancelled');
-        renderApp();
+        await renderApp(); // need fresh order list from DB
     } catch (e) { alert(e.message); }
 }
 
@@ -188,9 +190,33 @@ async function updateStock(itemId, newStock) {
 //  PAGE NAVIGATION
 // ============================================================
 
-function showRegisterPage() { currentPage = 'register'; renderApp(); }
-function showLoginPage()    { currentPage = 'login';    renderApp(); }
-function setAdminPage(page) { adminPage   = page;       renderApp(); }
+function showRegisterPage() { currentPage = 'register'; renderInPlace(); }
+function showLoginPage()    { currentPage = 'login';    renderInPlace(); }
+
+// Admin tab switch — data already loaded, just swap the content panel
+function setAdminPage(page) {
+    adminPage = page;
+    const main = document.querySelector('.admin-main');
+    if (main) {
+        // Re-render only the main content area, sidebar stays untouched
+        let pageContent = '';
+        if      (page === 'menu')         pageContent = renderPageMenu();
+        else if (page === 'inventory')    pageContent = renderPageInventory();
+        else if (page === 'sales-report') pageContent = renderPageSalesReport();
+        else if (page === 'orders')       pageContent = renderPageOrders();
+        else if (page === 'sales')        pageContent = renderPageSales();
+        main.innerHTML = pageContent;
+
+        // Update active state on nav buttons without re-rendering sidebar
+        document.querySelectorAll('.admin-nav-item').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.page === page);
+        });
+
+        attachEvents();
+    } else {
+        renderInPlace();
+    }
+}
 
 // ============================================================
 //  RENDER HELPERS
@@ -304,7 +330,6 @@ function renderPageMenu() {
         </div>`;
     }
 
-    // Build category options from loaded _categories
     const catOptions = _categories.map(c =>
         `<option value="${c.categoryID}">${c.name}</option>`
     ).join('');
@@ -770,25 +795,25 @@ function attachEvents() {
 }
 
 // ============================================================
-//  MAIN RENDER  (async – fetches fresh data every time)
+//  RENDER IN PLACE  (no fetch — uses existing cached data)
+//  Use for: cart changes, tab switches, login/register toggle
 // ============================================================
 
-async function renderApp() {
+function renderInPlace() {
     const root = document.getElementById('app');
     if (!root) return;
 
-    // ── Not logged in ────────────────────────────────────────
     if (!currentUser) {
-        if (currentPage === 'login') {
-            root.innerHTML = renderLogin();
+        root.innerHTML = currentPage === 'login' ? renderLogin() : renderRegister();
 
+        if (currentPage === 'login') {
             document.getElementById('doLoginBtn').addEventListener('click', async function () {
                 const uname  = document.getElementById('loginUsername').value;
                 const pwd    = document.getElementById('loginPassword').value;
                 const msgDiv = document.getElementById('loginMessage');
                 try {
                     const ok = await login(uname, pwd);
-                    if (ok) { renderApp(); }
+                    if (ok) { await renderApp(); }
                     else {
                         msgDiv.innerHTML = '<div class="error-message">❌ Invalid username or password</div>';
                         setTimeout(() => { if (msgDiv) msgDiv.innerHTML = ''; }, 3000);
@@ -809,8 +834,6 @@ async function renderApp() {
             if (registerLink) registerLink.addEventListener('click', showRegisterPage);
 
         } else {
-            root.innerHTML = renderRegister();
-
             document.getElementById('doRegisterBtn').addEventListener('click', async function () {
                 const uname      = document.getElementById('regUsername').value;
                 const pwd        = document.getElementById('regPassword').value;
@@ -843,32 +866,55 @@ async function renderApp() {
         return;
     }
 
-    // ── Admin ────────────────────────────────────────────────
     if (currentUser.role === 'admin') {
-        root.innerHTML = '<div style="text-align:center;padding:60px;color:#999;">Loading admin data…</div>';
+        root.innerHTML = renderAdmin();
+        attachEvents();
+        return;
+    }
+
+    if (currentUser.role === 'customer') {
+        root.innerHTML = renderCustomer();
+        attachEvents();
+    }
+}
+
+// ============================================================
+//  MAIN RENDER  (fetches fresh data, then renders)
+//  Use for: login, post-order, post-cancel, stock updates
+// ============================================================
+
+async function renderApp() {
+    const root = document.getElementById('app');
+    if (!root) return;
+
+    if (!currentUser) {
+        renderInPlace();
+        return;
+    }
+
+    // Only show the loading spinner on the very first load
+    if (_firstLoad) {
+        root.innerHTML = '<div style="text-align:center;padding:60px;color:#999;">Loading…</div>';
+    }
+
+    if (currentUser.role === 'admin') {
         try {
             await Promise.all([loadMenuItems(), loadCategories(), loadOrders(), loadAdminExtras()]);
         } catch (e) {
             root.innerHTML = '<div class="error-message" style="margin:40px auto;max-width:500px;">❌ Failed to load data: ' + e.message + '</div>';
             return;
         }
-        root.innerHTML = renderAdmin();
-        attachEvents();
-        return;
-    }
-
-    // ── Customer ─────────────────────────────────────────────
-    if (currentUser.role === 'customer') {
-        root.innerHTML = '<div style="text-align:center;padding:60px;color:#999;">Loading menu…</div>';
+    } else if (currentUser.role === 'customer') {
         try {
             await Promise.all([loadMenuItems(), loadOrders(currentUser.userID)]);
         } catch (e) {
             root.innerHTML = '<div class="error-message" style="margin:40px auto;max-width:500px;">❌ Failed to load data: ' + e.message + '</div>';
             return;
         }
-        root.innerHTML = renderCustomer();
-        attachEvents();
     }
+
+    _firstLoad = false;
+    renderInPlace();
 }
 
 // ============================================================
