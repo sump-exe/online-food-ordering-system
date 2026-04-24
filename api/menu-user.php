@@ -7,12 +7,12 @@ $userMenuActions = [
                     COALESCE(m.name, CONCAT('Item #', m.itemID)) AS name,
                     m.price,
                     m.stock,
-                    m.categoryID,
+                    COALESCE(m.categoryID, m.category_id) AS categoryID,
                     c.name AS category_name,
                     (m.stock > 0) AS available,
                     m.timeToPrepare
              FROM menu_items m
-             LEFT JOIN categories c ON c.categoryID = m.categoryID
+             LEFT JOIN categories c ON c.categoryID = COALESCE(m.categoryID, m.category_id)
              ORDER BY m.itemID"
         );
         respond(fetchAllRows($result, ['itemID', 'price', 'stock', 'categoryID'], ['available']));
@@ -22,4 +22,3 @@ $userMenuActions = [
         respond(fetchAllRows($result, ['categoryID']));
     },
 ];
-

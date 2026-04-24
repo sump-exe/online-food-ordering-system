@@ -18,9 +18,9 @@ $adminMenuInventoryActions = [
         }
 
         $stmt = $conn->prepare(
-            "INSERT INTO menu_items (name, price, stock, categoryID, timeToPrepare) VALUES (?, ?, ?, ?, NOW())"
+            "INSERT INTO menu_items (name, price, stock, category_id, categoryID, timeToPrepare) VALUES (?, ?, ?, ?, ?, NOW())"
         );
-        $stmt->bind_param('siii', $name, $price, $stock, $categoryID);
+        $stmt->bind_param('siiii', $name, $price, $stock, $categoryID, $categoryID);
         executePrepared($stmt, 'Failed to add item');
         $newId = $stmt->insert_id;
         $stmt->close();
@@ -50,4 +50,3 @@ $adminMenuInventoryActions = [
         respondSuccess();
     },
 ];
-

@@ -4,11 +4,10 @@ import {
     attachAdminMenuInventoryEvents,
     loadCategories,
     loadMenuItems,
-    renderAdminInventoryPage,
     renderAdminMenuPage,
     renderAdminNavBar,
 } from './menu-inventory-admin.js';
-import { loadAdminSalesData, renderAdminSalesPage, renderAdminSalesReportPage } from './sales-report-admin.js';
+import { loadAdminSalesData, renderAdminSalesPage } from './sales-report-admin.js';
 import { attachAdminOrderEvents, loadAdminOrders, renderAdminOrdersPage } from './order-history-admin.js';
 import { loadUsers, renderAdminUsersPage } from './users-management-admin.js';
 import { loadUserOrders } from './order-history-user.js';
@@ -26,12 +25,6 @@ export function setAdminPage(page) {
 function renderAdminPageContent() {
     if (state.adminPage === 'menu') {
         return renderAdminMenuPage();
-    }
-    if (state.adminPage === 'inventory') {
-        return renderAdminInventoryPage();
-    }
-    if (state.adminPage === 'sales-report') {
-        return renderAdminSalesReportPage();
     }
     if (state.adminPage === 'orders') {
         return renderAdminOrdersPage();

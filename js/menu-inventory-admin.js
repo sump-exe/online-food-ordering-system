@@ -12,8 +12,6 @@ export async function loadCategories() {
 export function renderAdminNavBar() {
     const navItems = [
         { id: 'menu', label: 'Menu & Inventory' },
-        { id: 'inventory', label: 'Inventory Status' },
-        { id: 'sales-report', label: 'Sales Report' },
         { id: 'orders', label: 'All Orders' },
         { id: 'sales', label: 'Sales' },
         { id: 'users', label: 'Users' },
@@ -42,25 +40,15 @@ export function renderAdminNavBar() {
 }
 
 export function renderAdminMenuPage() {
-    let menuHtml = '';
-    for (const item of state.menuItems) {
-        const stockStatus = item.stock === 0
-            ? 'Out of Stock'
-            : item.stock < 10
-                ? `Low Stock (${item.stock})`
-                : `In Stock (${item.stock})`;
-
-        menuHtml += `
-        <div class="menu-row">
-            <span>
-                <strong>${item.name}</strong>
-                <br><small>P${(item.price / 100).toFixed(2)} | ${item.category_name || 'Uncategorised'} | ${stockStatus}</small>
-            </span>
-            <div>
-                <button class="editStockBtn btn-secondary small-btn" data-id="${item.itemID}" data-stock="${item.stock}">Update Stock</button>
-            </div>
-        </div>`;
-    }
+    const rowsHtml = state.menuItems.map((item) => `
+        <tr>
+            <td><strong>${item.name}</strong></td>
+            <td>${item.category_name || '-'}</td>
+            <td>${item.stock}</td>
+            <td>P${(item.price / 100).toFixed(2)}</td>
+            <td><button class="editStockBtn btn-secondary small-btn" data-id="${item.itemID}" data-stock="${item.stock}">Update Stock</button></td>
+        </tr>
+    `).join('');
 
     const categoryOptions = state.categories.map((category) => (
         `<option value="${category.categoryID}">${category.name}</option>`
@@ -71,10 +59,6 @@ export function renderAdminMenuPage() {
         <div class="page-header">
             <h1>Menu &amp; Inventory Management</h1>
             <p>Manage your menu items, prices and stock levels</p>
-        </div>
-        <div class="panel">
-            <h2>Current Menu Items</h2>
-            <div class="item-list">${menuHtml || '<p style="text-align:center;color:#aaa;padding:20px;">No items found.</p>'}</div>
         </div>
         <div class="panel">
             <h2>Add New Item</h2>
@@ -98,64 +82,12 @@ export function renderAdminMenuPage() {
                 <button id="addItemBtn" class="btn-primary" style="padding:12px 24px;white-space:nowrap;">Add Item</button>
             </div>
         </div>
-    </div>`;
-}
-
-export function renderAdminInventoryPage() {
-    const lowStock = state.menuItems.filter((item) => item.stock <= 10 && item.stock > 0);
-    const outOfStock = state.menuItems.filter((item) => item.stock === 0);
-    const goodStock = state.menuItems.filter((item) => item.stock > 10);
-
-    const rowsHtml = state.menuItems.map((item) => {
-        const pct = Math.min(100, (item.stock / 60) * 100);
-        const barColor = item.stock === 0 ? '#dc2626' : item.stock < 10 ? '#f59e0b' : '#10b981';
-
-        return `
-        <tr>
-            <td><strong>${item.name}</strong></td>
-            <td>${item.category_name || '-'}</td>
-            <td>${item.stock}</td>
-            <td>
-                <div class="stock-bar-wrap">
-                    <div class="stock-bar-fill" style="width:${pct}%;background:${barColor};"></div>
-                </div>
-            </td>
-            <td>
-                <span class="inv-badge" style="background:${barColor}20;color:${barColor};">
-                    ${item.stock === 0 ? 'Out of Stock' : item.stock < 10 ? 'Low Stock' : 'Good'}
-                </span>
-            </td>
-            <td><button class="editStockBtn btn-secondary small-btn" data-id="${item.itemID}" data-stock="${item.stock}">Update</button></td>
-        </tr>`;
-    }).join('');
-
-    return `
-    <div class="admin-page-content">
-        <div class="page-header">
-            <h1>Inventory Status</h1>
-            <p>Monitor stock levels across all menu items</p>
-        </div>
-        <div class="grid-3col" style="margin-bottom:28px;">
-            <div class="stat-card" style="--accent:#10b981;">
-                <div class="stat-val">${goodStock.length}</div>
-                <div class="stat-label">Well Stocked</div>
-            </div>
-            <div class="stat-card" style="--accent:#f59e0b;">
-                <div class="stat-val">${lowStock.length}</div>
-                <div class="stat-label">Low Stock</div>
-            </div>
-            <div class="stat-card" style="--accent:#dc2626;">
-                <div class="stat-val">${outOfStock.length}</div>
-                <div class="stat-label">Out of Stock</div>
-            </div>
-        </div>
-        ${lowStock.length > 0 ? `<div class="alert-banner"><strong>Low stock alert:</strong> ${lowStock.map((item) => item.name).join(', ')}</div>` : ''}
         <div class="panel">
             <h2>Stock Overview</h2>
             <div style="overflow-x:auto;">
                 <table>
-                    <thead><tr><th>Item</th><th>Category</th><th>Qty</th><th style="min-width:160px;">Level</th><th>Status</th><th>Action</th></tr></thead>
-                    <tbody>${rowsHtml}</tbody>
+                    <thead><tr><th>Item</th><th>Category</th><th>QTY</th><th>Price</th><th>Action</th></tr></thead>
+                    <tbody>${rowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No items found.</td></tr>'}</tbody>
                 </table>
             </div>
         </div>
