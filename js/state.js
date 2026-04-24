@@ -1,0 +1,18 @@
+export const state = {
+    currentUser: null,
+    customerCart: [],
+    currentPage: 'login',
+    adminPage: 'menu',
+    firstLoad: true,
+    menuItems: [],
+    categories: [],
+    orders: [],
+    users: [],
+    orderStats: { Preparing: 0, Complete: 0, Cancelled: 0 },
+    dailySales: { totalSales: 0, orderCount: 0 },
+    monthlySales: { totalSales: 0, orderCount: 0 },
+    salesByDate: [],
+    salesByCustomer: [],
+    currentResetToken: null,
+    currentResetUsername: null,
+};

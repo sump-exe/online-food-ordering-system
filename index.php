@@ -39,6 +39,6 @@ if ($dbOk) $conn->close();
         // Expose DB status to app.js
         window.DB_CONNECTED = <?= $dbOk ? 'true' : 'false' ?>;
     </script>
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>
