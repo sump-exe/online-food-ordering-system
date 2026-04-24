@@ -12,4 +12,5 @@ export const state = {
     salesByCustomer: [],
     currentResetToken: null,
     currentResetUsername: null,
+    isOrderHistoryOpen: false,
 };

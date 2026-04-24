@@ -18,6 +18,7 @@ export function logout(renderApp) {
     state.firstLoad = true;
     state.currentResetToken = null;
     state.currentResetUsername = null;
+    state.isOrderHistoryOpen = false;
     renderApp();
 }
 

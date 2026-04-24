@@ -46,6 +46,26 @@ export function renderCustomerPage() {
         }
     }
 
+    const orderHistoryDrawer = (
+        `<div class="order-history-overlay${state.isOrderHistoryOpen ? ' open' : ''}" id="orderHistoryOverlay"></div>` +
+        `<aside class="order-history-drawer${state.isOrderHistoryOpen ? ' open' : ''}" id="orderHistoryDrawer">` +
+            '<div class="order-history-drawer-header">' +
+                '<div>' +
+                    '<div class="order-history-kicker">Customer</div>' +
+                    '<h2>My Order History</h2>' +
+                '</div>' +
+                '<button class="order-history-close" id="closeOrderHistoryBtn">Close</button>' +
+            '</div>' +
+            '<div class="order-history-drawer-body">' +
+                '<div style="overflow-x:auto;">' +
+                    '<table><thead><tr><th>Order ID</th><th>Date</th><th>Total</th><th>Status</th><th>Payment Ref</th><th>Action</th></tr></thead>' +
+                    `<tbody>${renderUserOrdersRows()}</tbody>` +
+                    '</table>' +
+                '</div>' +
+            '</div>' +
+        '</aside>'
+    );
+
     return (
         '<div class="top-bar">' +
             '<div class="logo">FoodieDash <span>Customer</span></div>' +
@@ -70,13 +90,7 @@ export function renderCustomerPage() {
                 '<button id="placeOrderBtn" class="btn-order">Place Order</button>' +
             '</div>' +
         '</div>' +
-        '<div class="panel" id="orderHistoryPanel"><h2>My Order History</h2>' +
-            '<div style="overflow-x:auto;">' +
-                '<table><thead><tr><th>Order ID</th><th>Date</th><th>Total</th><th>Status</th><th>Payment Ref</th><th>Action</th></tr></thead>' +
-                `<tbody>${renderUserOrdersRows()}</tbody>` +
-                '</table>' +
-            '</div>' +
-        '</div>'
+        orderHistoryDrawer
     );
 }
 
@@ -87,6 +101,8 @@ export function attachCustomerEvents(callbacks) {
     const dropdownMenu = document.getElementById('dropdownMenu');
     const dropdownArrow = document.getElementById('dropdownArrow');
     const logoutBtn = document.getElementById('logoutBtn');
+    const orderHistoryOverlay = document.getElementById('orderHistoryOverlay');
+    const closeOrderHistoryBtn = document.getElementById('closeOrderHistoryBtn');
 
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => logout(renderApp));
@@ -118,10 +134,22 @@ export function attachCustomerEvents(callbacks) {
             if (dropdownArrow) {
                 dropdownArrow.classList.remove('open');
             }
-            const panel = document.getElementById('orderHistoryPanel');
-            if (panel) {
-                panel.scrollIntoView({ behavior: 'smooth' });
-            }
+            state.isOrderHistoryOpen = true;
+            renderInPlace();
+        });
+    }
+
+    if (orderHistoryOverlay) {
+        orderHistoryOverlay.addEventListener('click', () => {
+            state.isOrderHistoryOpen = false;
+            renderInPlace();
+        });
+    }
+
+    if (closeOrderHistoryBtn) {
+        closeOrderHistoryBtn.addEventListener('click', () => {
+            state.isOrderHistoryOpen = false;
+            renderInPlace();
         });
     }
 
