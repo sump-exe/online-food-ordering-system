@@ -968,8 +968,354 @@ async function renderApp() {
     _firstLoad = false;
     renderInPlace();
 }
+// Add these functions to your app.js file
 
-// ============================================================
-//  BOOT
-// ============================================================
+// Forgot Password Functions
+async function requestPasswordReset(username, email) {
+    try {
+        const data = await apiPost('forgotPassword', { username, email });
+        return data;
+    } catch (e) {
+        throw new Error(e.message);
+    }
+}
+
+async function resetPassword(token, username, newPassword, confirmPassword) {
+    try {
+        const data = await apiPost('resetPassword', { 
+            token, 
+            username, 
+            newPassword, 
+            confirmPassword 
+        });
+        return data;
+    } catch (e) {
+        throw new Error(e.message);
+    }
+}
+
+async function verifyResetToken(token, username) {
+    try {
+        const data = await apiGet('verifyResetToken', { token, username });
+        return data.valid;
+    } catch (e) {
+        return false;
+    }
+}
+
+// Add this function to show forgot password modal/dialog
+function showForgotPasswordDialog() {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="forgotPasswordModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+            <div class="glass-card" style="max-width:450px;width:90%;padding:30px;position:relative;">
+                <button onclick="closeForgotPasswordModal()" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+                <div style="text-align:center;margin-bottom:20px;">
+                    <span style="font-size:2rem;">🔐</span>
+                    <h2 style="color:#ff5722;margin-top:10px;">Forgot Password?</h2>
+                    <p style="color:#666;font-size:0.9rem;">Enter your username to reset your password</p>
+                </div>
+                <div id="forgotPasswordMessage"></div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="resetUsername" placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label>Email (Optional)</label>
+                    <input type="email" id="resetEmail" placeholder="Enter your email (optional)">
+                </div>
+                <button id="requestResetBtn" class="btn-primary" style="width:100%;padding:12px;">Send Reset Link</button>
+                <div style="text-align:center;margin-top:20px;">
+                    <a class="hyperlink" onclick="closeForgotPasswordModal()">Back to Login</a>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('forgotPasswordModal');
+    if (existingModal) existingModal.remove();
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Add event listener to request button
+    document.getElementById('requestResetBtn').addEventListener('click', async function() {
+        const username = document.getElementById('resetUsername').value;
+        const email = document.getElementById('resetEmail').value;
+        const msgDiv = document.getElementById('forgotPasswordMessage');
+        
+        if (!username) {
+            msgDiv.innerHTML = '<div class="error-message">❌ Please enter your username</div>';
+            return;
+        }
+        
+        try {
+            const result = await requestPasswordReset(username, email);
+            if (result.success) {
+                msgDiv.innerHTML = `
+                    <div class="success-message">
+                        ✅ ${result.message}<br><br>
+                        <strong>Your reset token:</strong><br>
+                        <code style="background:#f0f0f0;padding:5px;display:inline-block;margin:5px 0;">${result.reset_token}</code><br><br>
+                        <a href="${result.reset_link}" target="_blank" style="color:#ff5722;">Click here to reset your password</a><br><br>
+                        <small>Note: In production, this would be sent to your email.</small>
+                    </div>
+                `;
+                
+                // Close modal after 5 seconds
+                setTimeout(() => {
+                    closeForgotPasswordModal();
+                }, 8000);
+            }
+        } catch (e) {
+            msgDiv.innerHTML = `<div class="error-message">❌ ${e.message}</div>`;
+        }
+    });
+}
+
+function closeForgotPasswordModal() {
+    const modal = document.getElementById('forgotPasswordModal');
+    if (modal) modal.remove();
+}
+
+function showResetPasswordPage(token, username) {
+    currentPage = 'reset-password';
+    currentResetToken = token;
+    currentResetUsername = username;
+    renderInPlace();
+}
+
+// Add state variables at the top with other state variables
+let currentResetToken = null;
+let currentResetUsername = null;
+
+// Update renderLogin function to include Forgot Password link
+function renderLogin() {
+    return `
+    <div class="glass-card" style="max-width:500px;margin:60px auto;padding:40px;">
+        <div style="text-align:center;margin-bottom:30px;">
+            <span style="font-size:3.5rem;">🍔🍕</span>
+            <h1 style="color:#ff5722;margin-top:10px;">FoodieDash</h1>
+            <p style="color:#666;">Database-Powered Food Ordering System</p>
+            <p style="color:#10b981;font-size:0.85rem;margin-top:8px;">🔒 Passwords are securely encrypted</p>
+        </div>
+        <div id="loginMessage"></div>
+        <div class="form-group"><label>Username</label><input type="text" id="loginUsername" placeholder="Enter your username"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="Enter your password"></div>
+        <button id="doLoginBtn" class="btn-primary" style="width:100%;padding:14px;">Sign In</button>
+        <div style="text-align:center;margin-top:15px;">
+            <a class="hyperlink" id="forgotPasswordLink" style="font-size:0.85rem;">🔒 Forgot Password?</a>
+        </div>
+        <div style="text-align:center;margin-top:15px;">
+            <span style="color:#666;">Don't have an account? </span>
+            <a class="hyperlink" id="goToRegisterLink">Create an Account</a>
+        </div>
+        <div style="margin-top:30px;padding-top:20px;border-top:1px solid #ffe0c4;">
+            <p style="font-size:0.75rem;color:#888;text-align:center;">
+                <strong>Demo Accounts:</strong><br>
+                Admin: admin / Admin123!<br>
+                Customer: john_doe / JohnDoe123!<br>
+                <span style="color:#10b981;">🔒 All passwords are hashed in the database</span>
+            </p>
+        </div>
+    </div>`;
+}
+
+// Add reset password page renderer
+function renderResetPassword() {
+    return `
+    <div class="glass-card" style="max-width:500px;margin:60px auto;padding:40px;">
+        <div style="text-align:center;margin-bottom:30px;">
+            <span style="font-size:3rem;">🔄</span>
+            <h1 style="color:#ff5722;margin-top:10px;">Reset Password</h1>
+            <p style="color:#666;">Create a new password for your account</p>
+        </div>
+        <div id="resetPasswordMessage"></div>
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="resetPwdUsername" value="${currentResetUsername || ''}" readonly style="background:#f5f5f5;">
+        </div>
+        <div class="form-group">
+            <label>New Password</label>
+            <input type="password" id="newPassword" placeholder="Enter new password">
+        </div>
+        <div class="form-group">
+            <label>Confirm New Password</label>
+            <input type="password" id="confirmNewPassword" placeholder="Confirm new password">
+        </div>
+        <div style="background:#fff5e6;padding:12px;border-radius:12px;margin-bottom:20px;">
+            <small style="color:#ff5722;">📌 Password Requirements:</small><br>
+            <small style="color:#666;">• At least 8 characters long</small><br>
+            <small style="color:#666;">• At least 1 uppercase letter (A-Z)</small><br>
+            <small style="color:#666;">• At least 1 special character (!@#$%^&*())</small>
+        </div>
+        <button id="confirmResetBtn" class="btn-primary" style="width:100%;padding:14px;">Reset Password</button>
+        <div style="text-align:center;margin-top:20px;">
+            <a class="hyperlink" id="backToLoginLink">Back to Login</a>
+        </div>
+    </div>`;
+}
+
+// Update the main renderInPlace function to handle reset password page
+function renderInPlace() {
+    const root = document.getElementById('app');
+    if (!root) return;
+
+    if (!currentUser) {
+        if (currentPage === 'reset-password') {
+            root.innerHTML = renderResetPassword();
+            
+            document.getElementById('confirmResetBtn').addEventListener('click', async function() {
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmPassword = document.getElementById('confirmNewPassword').value;
+                const msgDiv = document.getElementById('resetPasswordMessage');
+                
+                if (!newPassword || !confirmPassword) {
+                    msgDiv.innerHTML = '<div class="error-message">❌ Please fill all fields</div>';
+                    return;
+                }
+                
+                if (newPassword !== confirmPassword) {
+                    msgDiv.innerHTML = '<div class="error-message">❌ Passwords do not match</div>';
+                    return;
+                }
+                
+                try {
+                    const result = await resetPassword(currentResetToken, currentResetUsername, newPassword, confirmPassword);
+                    if (result.success) {
+                        msgDiv.innerHTML = '<div class="success-message">✅ ' + result.message + '</div>';
+                        setTimeout(() => {
+                            currentPage = 'login';
+                            currentResetToken = null;
+                            currentResetUsername = null;
+                            renderInPlace();
+                        }, 3000);
+                    }
+                } catch (e) {
+                    msgDiv.innerHTML = '<div class="error-message">❌ ' + e.message + '</div>';
+                }
+            });
+            
+            document.getElementById('backToLoginLink').addEventListener('click', () => {
+                currentPage = 'login';
+                currentResetToken = null;
+                currentResetUsername = null;
+                renderInPlace();
+            });
+            
+            return;
+        }
+        
+        root.innerHTML = currentPage === 'login' ? renderLogin() : renderRegister();
+
+        if (currentPage === 'login') {
+            document.getElementById('doLoginBtn').addEventListener('click', async function () {
+                const uname  = document.getElementById('loginUsername').value;
+                const pwd    = document.getElementById('loginPassword').value;
+                const msgDiv = document.getElementById('loginMessage');
+                try {
+                    const ok = await login(uname, pwd);
+                    if (ok) { await renderApp(); }
+                    else {
+                        msgDiv.innerHTML = '<div class="error-message">❌ Invalid username or password</div>';
+                        setTimeout(() => { if (msgDiv) msgDiv.innerHTML = ''; }, 3000);
+                    }
+                } catch (e) {
+                    msgDiv.innerHTML = '<div class="error-message">❌ ' + e.message + '</div>';
+                    setTimeout(() => { if (msgDiv) msgDiv.innerHTML = ''; }, 3000);
+                }
+            });
+            
+            // Add forgot password link handler
+            const forgotLink = document.getElementById('forgotPasswordLink');
+            if (forgotLink) {
+                forgotLink.addEventListener('click', showForgotPasswordDialog);
+            }
+
+            ['loginUsername', 'loginPassword'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('keydown', e => {
+                        if (e.key === 'Enter') document.getElementById('doLoginBtn').click();
+                    });
+                }
+            });
+
+            const registerLink = document.getElementById('goToRegisterLink');
+            if (registerLink) registerLink.addEventListener('click', showRegisterPage);
+
+        } else {
+            document.getElementById('doRegisterBtn').addEventListener('click', async function () {
+                const uname      = document.getElementById('regUsername').value;
+                const pwd        = document.getElementById('regPassword').value;
+                const confirmPwd = document.getElementById('regConfirmPassword').value;
+                const msgDiv     = document.getElementById('registerMessage');
+
+                if (!uname || !pwd) {
+                    msgDiv.innerHTML = '<div class="error-message">❌ Please fill all fields</div>';
+                    setTimeout(() => { if (msgDiv) msgDiv.innerHTML = ''; }, 3000);
+                    return;
+                }
+                if (pwd !== confirmPwd) {
+                    msgDiv.innerHTML = '<div class="error-message">❌ Passwords do not match</div>';
+                    setTimeout(() => { if (msgDiv) msgDiv.innerHTML = ''; }, 3000);
+                    return;
+                }
+                const result = await registerUser(uname, pwd);
+                if (result.success) {
+                    msgDiv.innerHTML = '<div class="success-message">✅ ' + result.message + '</div>';
+                    setTimeout(showLoginPage, 2000);
+                } else {
+                    msgDiv.innerHTML = '<div class="error-message">❌ ' + result.message + '</div>';
+                    setTimeout(() => { if (msgDiv) msgDiv.innerHTML = ''; }, 3000);
+                }
+            });
+
+            const loginLink = document.getElementById('goToLoginLink');
+            if (loginLink) loginLink.addEventListener('click', showLoginPage);
+        }
+        return;
+    }
+
+    if (currentUser.role === 'admin') {
+        root.innerHTML = renderAdmin();
+        attachEvents();
+        return;
+    }
+
+    if (currentUser.role === 'customer') {
+        root.innerHTML = renderCustomer();
+        attachEvents();
+    }
+}
+
+// Add this to check for reset token in URL when page loads
+function checkForResetToken() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const username = urlParams.get('username');
+    
+    if (token && username) {
+        verifyResetToken(token, username).then(isValid => {
+            if (isValid) {
+                currentResetToken = token;
+                currentResetUsername = username;
+                currentPage = 'reset-password';
+                renderInPlace();
+            } else {
+                alert('Invalid or expired reset link. Please request a new one.');
+            }
+        });
+    }
+}
+
+// Call this when the app loads
+// Add at the end of the file, replace the renderApp() call with:
+// checkForResetToken();
+// renderApp();
+
+// Update the boot section at the bottom of app.js
+// Replace the last line with:
+checkForResetToken();
 renderApp();

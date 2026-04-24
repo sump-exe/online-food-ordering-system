@@ -463,6 +463,157 @@ switch ($action) {
         respond(fetchAllRows($result, ['id']));
     }
 
+    // Add this new case for forgot password request
+case 'forgotPassword': {
+    $username = $body['username'] ?? '';
+    $email = $body['email'] ?? '';
+    
+    if (!$username) respondError('Username is required.');
+    
+    // Check if user exists
+    $table = null;
+    $idField = null;
+    $userData = null;
+    
+    // Check in customers table
+    $stmt = $conn->prepare("SELECT customerID, username, email FROM customers WHERE username = ?");
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $userData = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$userData) {
+        // Check in users table (admin)
+        $stmt = $conn->prepare("SELECT userID, username, email FROM users WHERE username = ?");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $userData = $result->fetch_assoc();
+        $stmt->close();
+    }
+    
+    if (!$userData) {
+        respondError('Username not found.');
+    }
+    
+    // Generate a unique reset token
+    $resetToken = bin2hex(random_bytes(32));
+    $tokenExpiry = date('Y-m-d H:i:s', strtotime('+1 hour'));
+    
+    // Store reset token in a new table (create this table)
+    $stmt = $conn->prepare("
+        INSERT INTO password_resets (username, token, expiry, created_at) 
+        VALUES (?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE 
+        token = VALUES(token), 
+        expiry = VALUES(expiry),
+        created_at = NOW()
+    ");
+    $stmt->bind_param('sss', $username, $resetToken, $tokenExpiry);
+    $stmt->execute();
+    $stmt->close();
+    
+    // In a real application, you would send an email here
+    // For demo purposes, we'll return the reset link
+    respond([
+        'success' => true,
+        'message' => 'Password reset link generated. Use this token to reset your password.',
+        'reset_token' => $resetToken, // In production, email this instead
+        'reset_link' => "reset-password.html?token=$resetToken&username=" . urlencode($username)
+    ]);
+}
+
+// Add this case for resetting password
+case 'resetPassword': {
+    $token = $body['token'] ?? '';
+    $username = $body['username'] ?? '';
+    $newPassword = $body['newPassword'] ?? '';
+    $confirmPassword = $body['confirmPassword'] ?? '';
+    
+    if (!$token || !$username) respondError('Token and username are required.');
+    if (!$newPassword || !$confirmPassword) respondError('New password and confirmation are required.');
+    if ($newPassword !== $confirmPassword) respondError('Passwords do not match.');
+    
+    // Validate password strength
+    validatePassword($newPassword);
+    
+    // Verify token
+    $stmt = $conn->prepare("
+        SELECT * FROM password_resets 
+        WHERE username = ? AND token = ? AND expiry > NOW()
+        ORDER BY created_at DESC LIMIT 1
+    ");
+    $stmt->bind_param('ss', $username, $token);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $resetRecord = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$resetRecord) {
+        respondError('Invalid or expired reset token. Please request a new password reset.');
+    }
+    
+    // Hash the new password
+    $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+    
+    // Update password in appropriate table
+    $updated = false;
+    
+    // Try updating in customers table
+    $stmt = $conn->prepare("UPDATE customers SET password = ? WHERE username = ?");
+    $stmt->bind_param('ss', $hashedPassword, $username);
+    $stmt->execute();
+    if ($stmt->affected_rows > 0) $updated = true;
+    $stmt->close();
+    
+    // If not found in customers, try users table
+    if (!$updated) {
+        $stmt = $conn->prepare("UPDATE users SET password = ? WHERE username = ?");
+        $stmt->bind_param('ss', $hashedPassword, $username);
+        $stmt->execute();
+        if ($stmt->affected_rows > 0) $updated = true;
+        $stmt->close();
+    }
+    
+    if (!$updated) {
+        respondError('User not found.');
+    }
+    
+    // Delete used reset token
+    $stmt = $conn->prepare("DELETE FROM password_resets WHERE username = ? AND token = ?");
+    $stmt->bind_param('ss', $username, $token);
+    $stmt->execute();
+    $stmt->close();
+    
+    respond([
+        'success' => true,
+        'message' => 'Password has been reset successfully! Please login with your new password.'
+    ]);
+}
+
+    // Add this case to verify reset token
+    case 'verifyResetToken': {
+        $token = $_GET['token'] ?? '';
+        $username = $_GET['username'] ?? '';
+        
+        if (!$token || !$username) {
+            respond(['valid' => false, 'message' => 'Missing token or username']);
+        }
+        
+        $stmt = $conn->prepare("
+            SELECT * FROM password_resets 
+            WHERE username = ? AND token = ? AND expiry > NOW()
+        ");
+        $stmt->bind_param('ss', $username, $token);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $valid = $result->num_rows > 0;
+        $stmt->close();
+        
+        respond(['valid' => $valid]);
+    }
+
     default:
         respondError("Unknown action: '$action'", 404);
 }
