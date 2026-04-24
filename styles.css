@@ -668,6 +668,19 @@ th {
     font-size: 0.75rem;
 }
 
+.menu-actions-cell {
+    padding-right: 2px;
+    white-space: nowrap;
+}
+
+.menu-actions-header {
+    white-space: nowrap;
+}
+
+.menu-inventory-table {
+    table-layout: fixed;
+}
+
 .stock-warning {
     color: #dc2626;
     font-size: 0.8rem;

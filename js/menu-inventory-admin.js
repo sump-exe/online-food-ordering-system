@@ -46,7 +46,10 @@ export function renderAdminMenuPage() {
             <td>${item.category_name || '-'}</td>
             <td>${item.stock}</td>
             <td>P${(item.price / 100).toFixed(2)}</td>
-            <td><button class="editStockBtn btn-secondary small-btn" data-id="${item.itemID}" data-stock="${item.stock}">Update Stock</button></td>
+            <td class="menu-actions-cell">
+                <button class="editStockBtn btn-secondary small-btn" data-id="${item.itemID}" data-stock="${item.stock}">Update Stock</button>
+                <button class="editPriceBtn btn-secondary small-btn" data-id="${item.itemID}" data-price="${item.price}">Update Price</button>
+            </td>
         </tr>
     `).join('');
 
@@ -85,8 +88,15 @@ export function renderAdminMenuPage() {
         <div class="panel">
             <h2>Stock Overview</h2>
             <div style="overflow-x:auto;">
-                <table>
-                    <thead><tr><th>Item</th><th>Category</th><th>QTY</th><th>Price</th><th>Action</th></tr></thead>
+                <table class="menu-inventory-table">
+                    <colgroup>
+                        <col style="width: 32%;">
+                        <col style="width: 21%;">
+                        <col style="width: 10%;">
+                        <col style="width: 13%;">
+                        <col style="width: 24%;">
+                    </colgroup>
+                    <thead><tr><th>Item</th><th>Category</th><th>QTY</th><th>Price</th><th class="menu-actions-header">Action</th></tr></thead>
                     <tbody>${rowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No items found.</td></tr>'}</tbody>
                 </table>
             </div>
@@ -96,6 +106,10 @@ export function renderAdminMenuPage() {
 
 async function updateStock(itemId, newStock) {
     await apiPost('updateStock', { itemId, stock: newStock });
+}
+
+async function updatePrice(itemId, newPrice) {
+    await apiPost('updatePrice', { itemId, price: newPrice });
 }
 
 async function addMenuItem(payload) {
@@ -124,6 +138,20 @@ export function attachAdminMenuInventoryEvents(callbacks) {
                 return;
             }
             updateStock(id, parseInt(newStock, 10))
+                .then(() => renderApp())
+                .catch((error) => alert(error.message));
+        });
+    });
+
+    document.querySelectorAll('.editPriceBtn').forEach((btn) => {
+        btn.addEventListener('click', function () {
+            const id = parseInt(this.dataset.id, 10);
+            const currentPrice = this.dataset.price;
+            const newPrice = prompt('Enter new price in cents:', currentPrice);
+            if (newPrice === null || Number.isNaN(parseInt(newPrice, 10))) {
+                return;
+            }
+            updatePrice(id, parseInt(newPrice, 10))
                 .then(() => renderApp())
                 .catch((error) => alert(error.message));
         });

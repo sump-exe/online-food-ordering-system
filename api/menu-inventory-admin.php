@@ -49,4 +49,19 @@ $adminMenuInventoryActions = [
 
         respondSuccess();
     },
+    'updatePrice' => function ($conn, $body) {
+        $itemId   = (int)($body['itemId'] ?? 0);
+        $newPrice = (int)($body['price'] ?? 0);
+
+        if ($newPrice <= 0) {
+            respondError('Price must be positive.');
+        }
+
+        $stmt = $conn->prepare("UPDATE menu_items SET price = ? WHERE itemID = ?");
+        $stmt->bind_param('ii', $newPrice, $itemId);
+        executePrepared($stmt, 'Failed to update price');
+        $stmt->close();
+
+        respondSuccess();
+    },
 ];
