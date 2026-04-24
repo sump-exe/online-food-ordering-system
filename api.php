@@ -95,8 +95,7 @@ function findAccount($conn, $table, $idField, $role, $username, $password) {
     $account = $result->fetch_assoc();
     $stmt->close();
     
-    // Verify password if account exists
-    if ($account && password_verify($password, $account['password'])) {
+    if ($account && verifyAndUpgradePassword($conn, $table, $idField, $account, $password)) {
         return [
             'id' => $account['id'],
             'username' => $account['username'],
@@ -104,6 +103,30 @@ function findAccount($conn, $table, $idField, $role, $username, $password) {
         ];
     }
     return null;
+}
+
+function verifyAndUpgradePassword($conn, $table, $idField, $account, $inputPassword) {
+    $storedPassword = $account['password'] ?? '';
+
+    if ($storedPassword === '') {
+        return false;
+    }
+
+    if (password_verify($inputPassword, $storedPassword)) {
+        return true;
+    }
+
+    // Backward compatibility for accounts created before hashing was added.
+    if (!password_get_info($storedPassword)['algo'] && hash_equals($storedPassword, $inputPassword)) {
+        $hashedPassword = password_hash($inputPassword, PASSWORD_DEFAULT);
+        $stmt = $conn->prepare("UPDATE $table SET password = ? WHERE $idField = ?");
+        $stmt->bind_param('si', $hashedPassword, $account['id']);
+        executePrepared($stmt, 'Failed to upgrade password hash');
+        $stmt->close();
+        return true;
+    }
+
+    return false;
 }
 
 function executePrepared($stmt, $errorMessage) {
