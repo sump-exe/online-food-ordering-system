@@ -60,6 +60,9 @@ function fetchAllRows($result, $intFields = [], $boolFields = []) {
 }
 
 function validatePassword($password) {
+    if (strlen($password) < 8) {
+        respondError('Password must be at least 8 characters long.');
+    }
     if (!preg_match('/[A-Z]/', $password))
         respondError('Password must contain at least one uppercase letter.');
     if (!preg_match('/[!@#$%^&*()\[\],.?":{}|<>]/', $password))
@@ -84,13 +87,23 @@ function checkUsernameExists($conn, $username) {
 
 function findAccount($conn, $table, $idField, $role, $username, $password) {
     $stmt = $conn->prepare(
-        "SELECT $idField AS id, username, ? AS role FROM $table WHERE username = ? AND password = ?"
+        "SELECT $idField AS id, username, password, ? AS role FROM $table WHERE username = ?"
     );
-    $stmt->bind_param('sss', $role, $username, $password);
+    $stmt->bind_param('ss', $role, $username);
     $stmt->execute();
-    $account = $stmt->get_result()->fetch_assoc();
+    $result = $stmt->get_result();
+    $account = $result->fetch_assoc();
     $stmt->close();
-    return $account ?: null;
+    
+    // Verify password if account exists
+    if ($account && password_verify($password, $account['password'])) {
+        return [
+            'id' => $account['id'],
+            'username' => $account['username'],
+            'role' => $account['role']
+        ];
+    }
+    return null;
 }
 
 function executePrepared($stmt, $errorMessage) {
@@ -148,8 +161,11 @@ switch ($action) {
 
         if (checkUsernameExists($conn, $username)) respondError('Username already exists.');
 
+        // Hash the password before storing
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+        
         $stmt = $conn->prepare("INSERT INTO customers (username, password) VALUES (?, ?)");
-        $stmt->bind_param('ss', $username, $password);
+        $stmt->bind_param('ss', $username, $hashedPassword);
         executePrepared($stmt, 'Registration failed');
         $newId = $stmt->insert_id;
         $stmt->close();
@@ -430,6 +446,21 @@ switch ($action) {
     case 'getCategories': {
         $result = $conn->query("SELECT categoryID, name FROM categories ORDER BY categoryID");
         respond(fetchAllRows($result, ['categoryID']));
+    }
+    
+    // NEW: Get all users with masked passwords (for admin view)
+    case 'getUsers': {
+        $result = $conn->query(
+            "SELECT customerID as id, username, 'customer' as role, 
+             '******** (encrypted)' as password_display
+             FROM customers 
+             UNION ALL 
+             SELECT userID as id, username, 'admin' as role,
+             '******** (encrypted)' as password_display
+             FROM users
+             ORDER BY role, username"
+        );
+        respond(fetchAllRows($result, ['id']));
     }
 
     default:

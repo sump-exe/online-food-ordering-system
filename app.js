@@ -1,6 +1,7 @@
 // ============================================================
 //  FoodieDash – Frontend (Database-connected version)
 //  All data is now read/written via api.php instead of localStorage.
+//  Passwords are now encrypted in the database.
 // ============================================================
 
 const API = 'api.php';
@@ -32,13 +33,14 @@ async function apiPost(action, body = {}) {
 let currentUser  = null;
 let customerCart = [];
 let currentPage  = 'login';   // 'login' | 'register'
-let adminPage    = 'menu';    // 'menu' | 'inventory' | 'sales-report' | 'orders' | 'sales'
+let adminPage    = 'menu';    // 'menu' | 'inventory' | 'sales-report' | 'orders' | 'sales' | 'users'
 let _firstLoad   = true;      // true until first successful data load
 
 // In-memory cache (refreshed on each renderApp call)
 let _menuItems       = [];
 let _categories      = [];
 let _orders          = [];
+let _users           = [];
 let _orderStats      = { Preparing: 0, Complete: 0, Cancelled: 0 };
 let _dailySales      = { totalSales: 0, orderCount: 0 };
 let _monthlySales    = { totalSales: 0, orderCount: 0 };
@@ -60,6 +62,10 @@ async function loadCategories() {
 async function loadOrders(customerId = null) {
     const params = customerId ? { customerId } : {};
     _orders = await apiGet('getOrders', params);
+}
+
+async function loadUsers() {
+    _users = await apiGet('getUsers');
 }
 
 async function loadAdminExtras() {
@@ -205,6 +211,7 @@ function setAdminPage(page) {
         else if (page === 'sales-report') pageContent = renderPageSalesReport();
         else if (page === 'orders')       pageContent = renderPageOrders();
         else if (page === 'sales')        pageContent = renderPageSales();
+        else if (page === 'users')        pageContent = renderPageUsers();
         main.innerHTML = pageContent;
 
         // Update active state on nav buttons without re-rendering sidebar
@@ -229,6 +236,7 @@ function renderLogin() {
             <span style="font-size:3.5rem;">🍔🍕</span>
             <h1 style="color:#ff5722;margin-top:10px;">FoodieDash</h1>
             <p style="color:#666;">Database-Powered Food Ordering System</p>
+            <p style="color:#10b981;font-size:0.85rem;margin-top:8px;">🔒 Passwords are securely encrypted</p>
         </div>
         <div id="loginMessage"></div>
         <div class="form-group"><label>Username</label><input type="text" id="loginUsername" placeholder="Enter your username"></div>
@@ -242,7 +250,8 @@ function renderLogin() {
             <p style="font-size:0.75rem;color:#888;text-align:center;">
                 <strong>Demo Accounts:</strong><br>
                 Admin: admin / Admin123!<br>
-                Customer: john_doe / JohnDoe123!
+                Customer: john_doe / JohnDoe123!<br>
+                <span style="color:#10b981;">🔒 All passwords are hashed in the database</span>
             </p>
         </div>
     </div>`;
@@ -255,6 +264,7 @@ function renderRegister() {
             <span style="font-size:3rem;">📝</span>
             <h1 style="color:#ff5722;margin-top:10px;">Create Account</h1>
             <p style="color:#666;">Join FoodieDash today</p>
+            <p style="color:#10b981;font-size:0.85rem;margin-top:8px;">🔒 Your password will be encrypted</p>
         </div>
         <div id="registerMessage"></div>
         <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="Choose a username"></div>
@@ -262,6 +272,7 @@ function renderRegister() {
         <div class="form-group"><label>Confirm Password</label><input type="password" id="regConfirmPassword" placeholder="Confirm your password"></div>
         <div style="background:#fff5e6;padding:12px;border-radius:12px;margin-bottom:20px;">
             <small style="color:#ff5722;">📌 Password Requirements:</small><br>
+            <small style="color:#666;">• At least 8 characters long</small><br>
             <small style="color:#666;">• At least 1 uppercase letter (A-Z)</small><br>
             <small style="color:#666;">• At least 1 special character (!@#$%^&*())</small>
         </div>
@@ -282,6 +293,7 @@ function renderAdminNavBar() {
         { id: 'sales-report', icon: '📈', label: 'Sales Report' },
         { id: 'orders',       icon: '📋', label: 'All Orders' },
         { id: 'sales',        icon: '💰', label: 'Sales' },
+        { id: 'users',        icon: '👥', label: 'Users' },
     ];
     const navLinksHtml = navItems.map(n =>
         `<button class="admin-nav-item ${adminPage === n.id ? 'active' : ''}" data-page="${n.id}">
@@ -595,6 +607,45 @@ function renderPageSales() {
     </div>`;
 }
 
+function renderPageUsers() {
+    const usersHtml = _users.map(user => `
+        <tr>
+            <td>${user.id}</td>
+            <td><strong>${user.username}</strong></td>
+            <td><span class="order-status status-${user.role === 'admin' ? 'Complete' : 'Preparing'}" style="background:${user.role === 'admin' ? '#d1fae5' : '#ffe3c9'}">${user.role}</span></td>
+            <td><code style="font-size:0.75rem;color:#666;">${user.password_display || '******** (encrypted)'}</code></td>
+        </tr>
+    `).join('');
+
+    return `
+    <div class="admin-page-content">
+        <div class="page-header">
+            <h1>👥 User Management</h1>
+            <p>View all registered users (passwords are securely encrypted)</p>
+        </div>
+        <div class="panel">
+            <h2>System Users</h2>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Password Storage</th>
+                        </tr>
+                    </thead>
+                    <tbody>${usersHtml || '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:24px;">No users found.</td></tr>'}</tbody>
+                </table>
+            </div>
+            <div class="alert-banner" style="margin-top:20px;background:#e8f5e9;border-color:#10b981;">
+                🔒 <strong>Security Notice:</strong> All passwords are stored using bcrypt hashing (one-way encryption). 
+                Passwords cannot be decrypted - they appear as asterisks in the database for security.
+            </div>
+        </div>
+    </div>`;
+}
+
 function renderAdmin() {
     let pageContent = '';
     if      (adminPage === 'menu')         pageContent = renderPageMenu();
@@ -602,6 +653,7 @@ function renderAdmin() {
     else if (adminPage === 'sales-report') pageContent = renderPageSalesReport();
     else if (adminPage === 'orders')       pageContent = renderPageOrders();
     else if (adminPage === 'sales')        pageContent = renderPageSales();
+    else if (adminPage === 'users')        pageContent = renderPageUsers();
 
     return `
     <div class="admin-layout">
@@ -685,7 +737,7 @@ function renderCustomer() {
         '<div class="panel" id="orderHistoryPanel"><h2>📜 My Order History</h2>' +
         '<div style="overflow-x:auto;">' +
         '<table><thead><tr><th>Order ID</th><th>Date</th><th>Total</th><th>Status</th><th>Payment Ref</th><th>Action</th></tr></thead>' +
-        '<tbody>' + (ordersHtml || '<tr><td colspan="6" style="text-align:center;">No orders yet</td></tr>') + '</tbody></table>' +
+        '<tbody>' + (ordersHtml || '<tr><td colspan="6" style="text-align:center;">No orders yet</td></tr>') + '</tbody>' +
         '</div></div>';
 }
 
@@ -899,7 +951,7 @@ async function renderApp() {
 
     if (currentUser.role === 'admin') {
         try {
-            await Promise.all([loadMenuItems(), loadCategories(), loadOrders(), loadAdminExtras()]);
+            await Promise.all([loadMenuItems(), loadCategories(), loadOrders(), loadAdminExtras(), loadUsers()]);
         } catch (e) {
             root.innerHTML = '<div class="error-message" style="margin:40px auto;max-width:500px;">❌ Failed to load data: ' + e.message + '</div>';
             return;
