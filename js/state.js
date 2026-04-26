@@ -13,4 +13,5 @@ export const state = {
     currentResetToken: null,
     currentResetUsername: null,
     isOrderHistoryOpen: false,
+    isCartOpen: false,
 };
