@@ -141,6 +141,45 @@ export function attachCustomerEvents(callbacks) {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) logoutBtn.addEventListener('click', () => logout(renderApp));
 
+    // Highlight the active category in the sidebar as the user scrolls
+    const sections = document.querySelectorAll('.customer-menu-section');
+    const categoryLinks = document.querySelectorAll('.customer-category-link');
+
+    if (sections.length && categoryLinks.length) {
+        const setActive = (id) => {
+            categoryLinks.forEach((link) => {
+                link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
+            });
+        };
+
+        // Set first category active on load
+        if (sections[0]) setActive(sections[0].id);
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) setActive(entry.target.id);
+                });
+            },
+            { rootMargin: '-20% 0px -70% 0px', threshold: 0 }
+        );
+        sections.forEach((section) => observer.observe(section));
+
+        // Smooth-scroll with offset for the sticky top bar
+        categoryLinks.forEach((link) => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').slice(1);
+                const target = document.getElementById(targetId);
+                if (target) {
+                    const offset = 24;
+                    const top = target.getBoundingClientRect().top + window.scrollY - offset;
+                    window.scrollTo({ top, behavior: 'smooth' });
+                }
+            });
+        });
+    }
+
     const dropdownBtn = document.getElementById('userDropdownBtn');
     const dropdownMenu = document.getElementById('dropdownMenu');
     const dropdownArrow = document.getElementById('dropdownArrow');
