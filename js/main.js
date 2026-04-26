@@ -97,6 +97,7 @@ export async function renderApp() {
         } else {
             await Promise.all([
                 loadMenuItems(),
+                loadCategories(),
                 loadUserOrders(state.currentUser.userID),
             ]);
         }

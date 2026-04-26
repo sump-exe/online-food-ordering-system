@@ -7,30 +7,42 @@ export async function loadUserMenuData(loadMenuItems, loadUserOrders) {
 }
 
 export function renderCustomerPage() {
-    // Build category → items map
     const categoryMap = {};
     for (const item of state.menuItems) {
         const category = item.category_name || 'Other';
-        if (!categoryMap[category]) categoryMap[category] = [];
+        if (!categoryMap[category]) {
+            categoryMap[category] = [];
+        }
         categoryMap[category].push(item);
     }
 
-    // Menu rows HTML only - NO CART DRAWER HTML HERE
-    let menuHtml = '';
-    for (const [category, items] of Object.entries(categoryMap)) {
-        menuHtml += `<div style="color:#ff5722;font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin:20px 0 10px;">${escapeHtml(category)}</div>`;
-        for (const item of items) {
-            const outOfStock = item.stock === 0;
-            const inCart = state.customerCart.find(c => c.ItemID === item.itemID);
+    const orderedCategories = state.categories
+        .map((category) => category.name)
+        .filter((name) => categoryMap[name]?.length);
+    const uncategorized = Object.keys(categoryMap).filter((name) => !orderedCategories.includes(name));
+    const categoryNames = [...orderedCategories, ...uncategorized];
 
-            menuHtml += `
+    const sidebarHtml = categoryNames.map((category) => `
+        <a class="customer-category-link" href="#${toSectionId(category)}">
+            <span>${escapeHtml(category)}</span>
+            <span class="customer-category-count">${categoryMap[category].length}</span>
+        </a>
+    `).join('');
+
+    const menuSectionsHtml = categoryNames.map((category) => {
+        const items = categoryMap[category];
+        const rowsHtml = items.map((item) => {
+            const outOfStock = item.stock === 0;
+            const inCart = state.customerCart.find((cartItem) => cartItem.ItemID === item.itemID);
+
+            return `
             <div class="menu-row${outOfStock ? '" style="opacity:0.45;' : '"'}">
                 <span>
                     <strong>${escapeHtml(item.name)}</strong><br>
                     <small>P${(item.price / 100).toFixed(2)} | Stock: ${item.stock}</small>
                 </span>
                 ${outOfStock
-                    ? `<button disabled style="opacity:0.5;cursor:not-allowed;">Out of Stock</button>`
+                    ? '<button disabled style="opacity:0.5;cursor:not-allowed;">Out of Stock</button>'
                     : inCart
                         ? `<div style="display:flex;align-items:center;gap:8px;">
                             <button class="qtyDownBtn" data-id="${item.itemID}" style="width:30px;height:30px;padding:0;border-radius:50%;background:#fff3ec;border:1.5px solid #ffd4bc;color:#ff5722;font-weight:700;font-size:1rem;cursor:pointer;">&#8722;</button>
@@ -44,16 +56,26 @@ export function renderCustomerPage() {
                                 data-stock="${item.stock}">Add to Cart</button>`
                 }
             </div>`;
-        }
-    }
+        }).join('');
 
-    // Cart count badge for dropdown
-    const cartCount = state.customerCart.reduce((sum, i) => sum + i.quantity, 0);
+        return `
+        <section class="customer-menu-section" id="${toSectionId(category)}">
+            <div class="customer-menu-section-header">
+                <div>
+                    <div class="customer-menu-section-kicker">Category</div>
+                    <h3>${escapeHtml(category)}</h3>
+                </div>
+                <span class="customer-menu-section-total">${items.length} item${items.length === 1 ? '' : 's'}</span>
+            </div>
+            ${rowsHtml}
+        </section>`;
+    }).join('');
+
+    const cartCount = state.customerCart.reduce((sum, item) => sum + item.quantity, 0);
     const cartBadgeHtml = cartCount > 0
         ? ` <span style="background:white;color:#ff5722;font-size:0.72rem;font-weight:800;padding:1px 8px;border-radius:50px;margin-left:4px;">${cartCount}</span>`
         : '';
 
-    // Return ONLY the menu page - NO drawers in main content
     return `
     <div class="top-bar">
         <div class="logo">FoodieDash <span>Customer</span></div>
@@ -65,21 +87,34 @@ export function renderCustomerPage() {
             <div class="dropdown-menu" id="dropdownMenu">
                 <div class="dropdown-header">My Account</div>
                 <button class="dropdown-item" id="viewCartDropBtn">
-                    🛒 View Cart${cartBadgeHtml}
+                    View Cart${cartBadgeHtml}
                 </button>
                 <button class="dropdown-item" id="viewOrdersDropBtn">
-                    📄 Order History
+                    Order History
                 </button>
                 <button class="dropdown-item danger" id="logoutBtn">
-                    🔓 Logout
+                    Logout
                 </button>
             </div>
         </div>
     </div>
 
-    <div class="panel" style="max-width:700px;margin:0 auto;">
-        <h2>Our Menu</h2>
-        ${menuHtml || '<p style="text-align:center;color:#aaa;padding:40px 0;">No items available.</p>'}
+    <div class="customer-menu-layout">
+        <aside class="customer-menu-sidebar">
+            <div class="customer-menu-sidebar-card">
+                <div class="customer-menu-sidebar-kicker">Browse</div>
+                <h2>Categories</h2>
+                <p class="customer-menu-sidebar-copy">Navigate the live menu using the categories from your database.</p>
+                <div class="customer-menu-sidebar-links">
+                ${sidebarHtml || '<p style="color:#aaa;">No categories available.</p>'}
+                </div>
+            </div>
+        </aside>
+
+        <div class="panel customer-menu-panel">
+            <h2>Our Menu</h2>
+            ${menuSectionsHtml || '<p style="text-align:center;color:#aaa;padding:40px 0;">No items available.</p>'}
+        </div>
     </div>`;
 }
 
@@ -93,14 +128,19 @@ function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 }
 
+function toSectionId(category) {
+    return `category-${String(category)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')}`;
+}
+
 export function attachCustomerEvents(callbacks) {
     const { renderApp, renderInPlace, logout } = callbacks;
 
-    // Logout
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) logoutBtn.addEventListener('click', () => logout(renderApp));
 
-    // User dropdown
     const dropdownBtn = document.getElementById('userDropdownBtn');
     const dropdownMenu = document.getElementById('dropdownMenu');
     const dropdownArrow = document.getElementById('dropdownArrow');
@@ -117,7 +157,6 @@ export function attachCustomerEvents(callbacks) {
         });
     }
 
-    // View Cart button - opens cart drawer
     const viewCartBtn = document.getElementById('viewCartDropBtn');
     if (viewCartBtn) {
         viewCartBtn.addEventListener('click', (e) => {
@@ -128,7 +167,6 @@ export function attachCustomerEvents(callbacks) {
         });
     }
 
-    // View Orders button - opens order history drawer
     const viewOrdersBtn = document.getElementById('viewOrdersDropBtn');
     if (viewOrdersBtn) {
         viewOrdersBtn.addEventListener('click', (e) => {
@@ -139,7 +177,6 @@ export function attachCustomerEvents(callbacks) {
         });
     }
 
-    // Add to cart buttons
     document.querySelectorAll('.addToCartBtn').forEach((btn) => {
         btn.addEventListener('click', function () {
             addToCart({
@@ -151,7 +188,6 @@ export function attachCustomerEvents(callbacks) {
         });
     });
 
-    // Quantity buttons in menu
     document.querySelectorAll('.qtyUpBtn').forEach((btn) => {
         btn.addEventListener('click', function () {
             updateQuantity(parseInt(this.dataset.id, 10), 1, renderInPlace);
@@ -164,21 +200,19 @@ export function attachCustomerEvents(callbacks) {
     });
 }
 
-// Open cart drawer
 function openCartDrawer(renderInPlace, renderApp) {
-    // Remove existing cart drawer
     const existingDrawer = document.getElementById('cartDrawer');
     const existingOverlay = document.getElementById('cartOverlay');
     if (existingDrawer) existingDrawer.remove();
     if (existingOverlay) existingOverlay.remove();
 
-    const cartCount = state.customerCart.reduce((sum, i) => sum + i.quantity, 0);
-    
+    const cartCount = state.customerCart.reduce((sum, item) => sum + item.quantity, 0);
+
     let cartItemsHtml = '';
     if (state.customerCart.length === 0) {
         cartItemsHtml = `
         <p style="text-align:center;color:#aaa;padding:32px 0;">
-            <span style="font-size:2rem;display:block;margin-bottom:8px;">🛒</span>
+            <span style="font-size:2rem;display:block;margin-bottom:8px;">Cart</span>
             Your cart is empty
         </p>`;
     } else {
@@ -187,13 +221,13 @@ function openCartDrawer(renderInPlace, renderApp) {
             <div class="cart-item">
                 <span>
                     <strong>${escapeHtml(item.name)}</strong><br>
-                    <small style="color:#7a6070;">P${(item.price / 100).toFixed(2)} × ${item.quantity}</small>
+                    <small style="color:#7a6070;">P${(item.price / 100).toFixed(2)} x ${item.quantity}</small>
                 </span>
                 <span style="display:flex;align-items:center;gap:8px;">
                     <strong style="color:#ff5722;min-width:60px;text-align:right;">P${(item.price * item.quantity / 100).toFixed(2)}</strong>
                     <button class="cart-qty-up" data-id="${item.ItemID}" style="width:32px;height:32px;padding:0;border-radius:50%;background:#fff3ec;border:1.5px solid #ffd4bc;color:#ff5722;font-weight:700;font-size:1.1rem;cursor:pointer;">+</button>
-                    <button class="cart-qty-down" data-id="${item.ItemID}" style="width:32px;height:32px;padding:0;border-radius:50%;background:#fff3ec;border:1.5px solid #ffd4bc;color:#ff5722;font-weight:700;font-size:1.1rem;cursor:pointer;">−</button>
-                    <button class="cart-remove" data-id="${item.ItemID}" style="width:32px;height:32px;padding:0;border-radius:50%;background:#dc2626;color:white;font-size:1rem;cursor:pointer;border:none;">×</button>
+                    <button class="cart-qty-down" data-id="${item.ItemID}" style="width:32px;height:32px;padding:0;border-radius:50%;background:#fff3ec;border:1.5px solid #ffd4bc;color:#ff5722;font-weight:700;font-size:1.1rem;cursor:pointer;">-</button>
+                    <button class="cart-remove" data-id="${item.ItemID}" style="width:32px;height:32px;padding:0;border-radius:50%;background:#dc2626;color:white;font-size:1rem;cursor:pointer;border:none;">x</button>
                 </span>
             </div>`;
         }
@@ -221,7 +255,6 @@ function openCartDrawer(renderInPlace, renderApp) {
 
     document.body.insertAdjacentHTML('beforeend', drawerHtml);
 
-    // Close handlers
     const closeBtn = document.getElementById('closeCartBtn');
     const overlay = document.getElementById('cartOverlay');
     const closeCart = () => {
@@ -231,7 +264,6 @@ function openCartDrawer(renderInPlace, renderApp) {
     if (closeBtn) closeBtn.addEventListener('click', closeCart);
     if (overlay) overlay.addEventListener('click', closeCart);
 
-    // Cart quantity buttons
     document.querySelectorAll('#cartDrawer .cart-qty-up').forEach((btn) => {
         btn.addEventListener('click', function () {
             updateQuantity(parseInt(this.dataset.id, 10), 1, () => {
@@ -257,7 +289,6 @@ function openCartDrawer(renderInPlace, renderApp) {
         });
     });
 
-    // Place order
     const placeBtn = document.getElementById('placeOrderBtn');
     if (placeBtn) {
         placeBtn.addEventListener('click', async () => {
@@ -267,9 +298,7 @@ function openCartDrawer(renderInPlace, renderApp) {
     }
 }
 
-// Open order history drawer
 function openOrderHistoryDrawer(renderInPlace, renderApp) {
-    // Remove existing drawer
     const existingDrawer = document.getElementById('orderHistoryDrawer');
     const existingOverlay = document.getElementById('orderHistoryOverlay');
     if (existingDrawer) existingDrawer.remove();
@@ -306,7 +335,6 @@ function openOrderHistoryDrawer(renderInPlace, renderApp) {
 
     document.body.insertAdjacentHTML('beforeend', drawerHtml);
 
-    // Close handlers
     const closeBtn = document.getElementById('closeOrderHistoryBtn');
     const overlay = document.getElementById('orderHistoryOverlay');
     const closeDrawer = () => {
@@ -316,7 +344,6 @@ function openOrderHistoryDrawer(renderInPlace, renderApp) {
     if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
     if (overlay) overlay.addEventListener('click', closeDrawer);
 
-    // Cancel order buttons
     document.querySelectorAll('#orderHistoryDrawer .cancelOrderBtn').forEach((btn) => {
         btn.addEventListener('click', async function () {
             const orderId = parseInt(this.dataset.id, 10);
