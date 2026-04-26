@@ -61,7 +61,6 @@ export function renderAdminMenuPage() {
     <div class="admin-page-content">
         <div class="page-header">
             <h1>Menu &amp; Inventory Management</h1>
-            <p>Manage your menu items, prices and stock levels</p>
         </div>
         <div class="panel">
             <h2>Add New Item</h2>

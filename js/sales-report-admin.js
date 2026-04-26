@@ -35,7 +35,6 @@ export function renderAdminSalesPage() {
     <div class="admin-page-content">
         <div class="page-header">
             <h1>Sales</h1>
-            <p>Detailed sales breakdown by date and customer</p>
         </div>
         <div class="stat-card big" style="--accent:#ff5722;margin-bottom:28px;">
             <div class="stat-val">P${(totalRevenue / 100).toFixed(2)}</div>

@@ -19,7 +19,6 @@ export function renderAdminUsersPage() {
     <div class="admin-page-content">
         <div class="page-header">
             <h1>User Management</h1>
-            <p>View all registered users (passwords are securely encrypted)</p>
         </div>
         <div class="panel">
             <h2>System Users</h2>

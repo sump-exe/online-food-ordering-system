@@ -104,8 +104,8 @@ export function renderCustomerPage() {
             <div class="customer-menu-sidebar-card">
                 <div class="customer-menu-sidebar-kicker">Browse</div>
                 <h2>Categories</h2>
-                <p class="customer-menu-sidebar-copy">Navigate the live menu using the categories from your database.</p>
                 <div class="customer-menu-sidebar-links">
+                <br>
                 ${sidebarHtml || '<p style="color:#aaa;">No categories available.</p>'}
                 </div>
             </div>

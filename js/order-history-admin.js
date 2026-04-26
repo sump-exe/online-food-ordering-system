@@ -32,7 +32,6 @@ export function renderAdminOrdersPage() {
     <div class="admin-page-content">
         <div class="page-header">
             <h1>All Orders</h1>
-            <p>View and manage all customer orders</p>
         </div>
         <div class="panel">
             <h2>Order Management</h2>

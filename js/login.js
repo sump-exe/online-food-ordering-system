@@ -67,8 +67,7 @@ function renderLogin() {
     <div class="glass-card" style="max-width:500px;margin:60px auto;padding:40px;">
         <div style="text-align:center;margin-bottom:30px;">
             <img src="${logoUrl}" alt="FoodieDash" style="max-width:220px;width:100%;height:auto;display:block;margin:0 auto 12px;">
-            <p style="color:#666;">Database-Powered Food Ordering System</p>
-            <p style="color:#10b981;font-size:0.85rem;margin-top:8px;">Passwords are securely encrypted</p>
+            <p style="color:#666;">Online Food Ordering System</p>
         </div>
         <div id="loginMessage"></div>
         <div class="form-group"><label>Username</label><input type="text" id="loginUsername" placeholder="Enter your username"></div>
@@ -80,14 +79,6 @@ function renderLogin() {
         <div style="text-align:center;margin-top:15px;">
             <span style="color:#666;">Don't have an account? </span>
             <a class="hyperlink" id="goToRegisterLink">Create an Account</a>
-        </div>
-        <div style="margin-top:30px;padding-top:20px;border-top:1px solid #ffe0c4;">
-            <p style="font-size:0.75rem;color:#888;text-align:center;">
-                <strong>Demo Accounts:</strong><br>
-                Admin: admin / Admin123!<br>
-                Customer: john_doe / JohnDoe123!<br>
-                <span style="color:#10b981;">All passwords are hashed in the database</span>
-            </p>
         </div>
     </div>`;
 }
