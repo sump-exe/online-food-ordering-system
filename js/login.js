@@ -64,7 +64,7 @@ function renderLogin() {
     return `
     <div class="glass-card" style="max-width:500px;margin:60px auto;padding:40px;">
         <div style="text-align:center;margin-bottom:30px;">
-            <img src="logo.png" alt="FoodieDash" style="max-width:220px;width:100%;height:auto;display:block;margin:0 auto 12px;">
+            <img src="img/logo.png" alt="FoodieDash" style="max-width:220px;width:100%;height:auto;display:block;margin:0 auto 12px;">
             <p style="color:#666;">Database-Powered Food Ordering System</p>
             <p style="color:#10b981;font-size:0.85rem;margin-top:8px;">Passwords are securely encrypted</p>
         </div>
