@@ -7,7 +7,7 @@ import {
     renderAdminMenuPage,
     renderAdminNavBar,
 } from './menu-inventory-admin.js';
-import { loadAdminSalesData, renderAdminSalesPage } from './sales-report-admin.js';
+import { attachAdminSalesEvents, loadAdminSalesData, renderAdminSalesPage } from './sales-report-admin.js';
 import { attachAdminOrderEvents, loadAdminOrders, renderAdminOrdersPage } from './order-history-admin.js';
 import { loadUsers, renderAdminUsersPage } from './users-management-admin.js';
 import { loadUserOrders } from './order-history-user.js';
@@ -62,6 +62,9 @@ export function renderInPlace() {
         attachAdminMenuInventoryEvents({ renderApp, setAdminPage, logout });
         if (state.adminPage === 'orders') {
             attachAdminOrderEvents(renderApp);
+        }
+        if (state.adminPage === 'sales') {
+            attachAdminSalesEvents(renderApp);
         }
         return;
     }
