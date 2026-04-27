@@ -8,10 +8,8 @@ export async function loadUsers() {
 export function renderAdminUsersPage() {
     const usersHtml = state.users.map((user) => `
         <tr>
-            <td>${user.id}</td>
             <td><strong>${user.username}</strong></td>
             <td><span class="order-status status-${user.role === 'admin' ? 'Complete' : 'Preparing'}" style="background:${user.role === 'admin' ? '#d1fae5' : '#ffe3c9'}">${user.role}</span></td>
-            <td><code style="font-size:0.75rem;color:#666;">${user.password_display || '******** (encrypted)'}</code></td>
         </tr>
     `).join('');
 
@@ -26,18 +24,12 @@ export function renderAdminUsersPage() {
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Username</th>
                             <th>Role</th>
-                            <th>Password Storage</th>
                         </tr>
                     </thead>
-                    <tbody>${usersHtml || '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:24px;">No users found.</td></tr>'}</tbody>
+                    <tbody>${usersHtml || '<tr><td colspan="2" style="text-align:center;color:#aaa;padding:24px;">No users found.</td></tr>'}</tbody>
                 </table>
-            </div>
-            <div class="alert-banner" style="margin-top:20px;background:#e8f5e9;border-color:#10b981;">
-                <strong>Security Notice:</strong> All passwords are stored using bcrypt hashing (one-way encryption).
-                Passwords cannot be decrypted and appear as asterisks in the database for security.
             </div>
         </div>
     </div>`;
