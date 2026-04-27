@@ -26,6 +26,10 @@ export const state = {
         day: '',
         user: '',
     },
+    adminOrderFilter: {
+        user: '',
+        status: '',
+    },
     currentResetToken: null,
     currentResetUsername: null,
     isOrderHistoryOpen: false,

@@ -103,7 +103,7 @@ export function renderInPlace() {
         root.innerHTML = renderAdminLayout();
         attachAdminMenuInventoryEvents({ renderApp, setAdminPage, logout });
         if (state.adminPage === 'orders') {
-            attachAdminOrderEvents(renderApp);
+            attachAdminOrderEvents({ renderApp, renderInPlace });
         }
         if (state.adminPage === 'sales') {
             attachAdminSalesEvents(renderApp);
