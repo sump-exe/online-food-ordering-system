@@ -27,6 +27,8 @@ $actionMap = [
     'forgotPassword' => ['group' => 'login', 'handler' => 'forgotPassword'],
     'resetPassword' => ['group' => 'login', 'handler' => 'resetPassword'],
     'verifyResetToken' => ['group' => 'login', 'handler' => 'verifyResetToken'],
+    'getAccountSettings' => ['group' => 'login', 'handler' => 'getAccountSettings'],
+    'updateAccountSettings' => ['group' => 'login', 'handler' => 'updateAccountSettings'],
     'createOrder' => ['group' => 'cart_user', 'handler' => 'createOrder'],
     'getOrders' => [
         'group' => isset($_GET['customerId']) ? 'order_history_user' : 'order_history_admin',

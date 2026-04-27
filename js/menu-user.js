@@ -1,3 +1,4 @@
+import { apiGet, apiPost } from './api.js';
 import { state } from './state.js';
 import { addToCart, getCartTotal, placeOrder, removeFromCart, updateQuantity } from './cart-user.js';
 import { cancelOrder, renderUserOrdersRows } from './order-history-user.js';
@@ -91,6 +92,9 @@ export function renderCustomerPage() {
                 </button>
                 <button class="dropdown-item" id="viewOrdersDropBtn">
                     Order History
+                </button>
+                <button class="dropdown-item" id="accountSettingsDropBtn">
+                    Account Settings
                 </button>
                 <button class="dropdown-item danger" id="logoutBtn">
                     Logout
@@ -213,6 +217,20 @@ export function attachCustomerEvents(callbacks) {
             dropdownMenu.classList.remove('open');
             if (dropdownArrow) dropdownArrow.classList.remove('open');
             openOrderHistoryDrawer(renderInPlace, renderApp);
+        });
+    }
+
+    const accountSettingsBtn = document.getElementById('accountSettingsDropBtn');
+    if (accountSettingsBtn) {
+        accountSettingsBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            dropdownMenu.classList.remove('open');
+            if (dropdownArrow) dropdownArrow.classList.remove('open');
+            try {
+                await openAccountSettingsDrawer(renderInPlace);
+            } catch (error) {
+                alert(error.message);
+            }
         });
     }
 
@@ -395,5 +413,99 @@ function openOrderHistoryDrawer(renderInPlace, renderApp) {
                 }
             }
         });
+    });
+}
+
+async function fetchAccountSettings() {
+    return apiGet('getAccountSettings', { customerId: state.currentUser.userID });
+}
+
+async function saveAccountSettings(payload) {
+    return apiPost('updateAccountSettings', payload);
+}
+
+async function openAccountSettingsDrawer(renderInPlace) {
+    const existingDrawer = document.getElementById('accountSettingsDrawer');
+    const existingOverlay = document.getElementById('accountSettingsOverlay');
+    if (existingDrawer) existingDrawer.remove();
+    if (existingOverlay) existingOverlay.remove();
+
+    const account = await fetchAccountSettings();
+
+    const drawerHtml = `
+    <div id="accountSettingsOverlay" class="order-history-overlay open"></div>
+    <aside id="accountSettingsDrawer" class="order-history-drawer open">
+        <div class="order-history-drawer-header">
+            <div>
+                <div class="order-history-kicker">Customer</div>
+                <h2>Account Settings</h2>
+            </div>
+            <button class="btn-secondary order-history-close" id="closeAccountSettingsBtn">Close</button>
+        </div>
+        <div class="order-history-drawer-body">
+            <div id="accountSettingsMessage"></div>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" value="${escapeHtml(account.username)}" readonly style="background:#f5f5f5;">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="accountEmail" value="${escapeHtml(account.email || '')}" placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="text" id="accountPhone" value="${escapeHtml(account.phone_number || '')}" placeholder="Enter your phone number">
+            </div>
+            <div style="border-top:2px solid #ffe0c4;margin:18px 0;padding-top:18px;">
+                <div style="font-weight:700;color:#7a6070;margin-bottom:12px;">Change Password</div>
+                <div class="form-group">
+                    <label>Current Password</label>
+                    <input type="password" id="accountCurrentPassword" placeholder="Enter current password">
+                </div>
+                <div class="form-group">
+                    <label>New Password</label>
+                    <input type="password" id="accountNewPassword" placeholder="Enter new password">
+                </div>
+                <div class="form-group">
+                    <label>Confirm New Password</label>
+                    <input type="password" id="accountConfirmPassword" placeholder="Confirm new password">
+                </div>
+            </div>
+            <button class="btn-primary" id="saveAccountSettingsBtn" style="width:100%;padding:14px;">Save Changes</button>
+        </div>
+    </aside>`;
+
+    document.body.insertAdjacentHTML('beforeend', drawerHtml);
+
+    const closeDrawer = () => {
+        document.getElementById('accountSettingsDrawer')?.remove();
+        document.getElementById('accountSettingsOverlay')?.remove();
+    };
+
+    document.getElementById('closeAccountSettingsBtn')?.addEventListener('click', closeDrawer);
+    document.getElementById('accountSettingsOverlay')?.addEventListener('click', closeDrawer);
+
+    document.getElementById('saveAccountSettingsBtn')?.addEventListener('click', async () => {
+        const msgDiv = document.getElementById('accountSettingsMessage');
+        const payload = {
+            customerId: state.currentUser.userID,
+            email: document.getElementById('accountEmail')?.value.trim() || '',
+            phoneNumber: document.getElementById('accountPhone')?.value.trim() || '',
+            currentPassword: document.getElementById('accountCurrentPassword')?.value || '',
+            newPassword: document.getElementById('accountNewPassword')?.value || '',
+            confirmPassword: document.getElementById('accountConfirmPassword')?.value || '',
+        };
+
+        try {
+            const result = await saveAccountSettings(payload);
+            state.currentUser = { ...state.currentUser, ...result.user };
+            msgDiv.innerHTML = '<div class="success-message">Account settings updated successfully.</div>';
+            setTimeout(() => {
+                closeDrawer();
+                renderInPlace();
+            }, 900);
+        } catch (error) {
+            msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        }
     });
 }

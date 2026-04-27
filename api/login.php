@@ -188,5 +188,109 @@ $loginActions = [
 
         respond(['valid' => $valid]);
     },
-];
+    'getAccountSettings' => function ($conn, $body) {
+        $customerId = (int)($_GET['customerId'] ?? 0);
 
+        if ($customerId <= 0) {
+            respondError('Customer ID is required.');
+        }
+
+        $stmt = $conn->prepare(
+            "SELECT customerID AS userID, username, email, phone_number
+             FROM customers
+             WHERE customerID = ?"
+        );
+        $stmt->bind_param('i', $customerId);
+        executePrepared($stmt, 'Failed to fetch account settings');
+        $result = $stmt->get_result();
+        $account = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$account) {
+            respondError('Customer account not found.', 404);
+        }
+
+        respond([
+            'userID' => (int)$account['userID'],
+            'username' => $account['username'],
+            'email' => $account['email'] ?? '',
+            'phone_number' => $account['phone_number'] ?? '',
+        ]);
+    },
+    'updateAccountSettings' => function ($conn, $body) {
+        $customerId = (int)($body['customerId'] ?? 0);
+        $email = trim((string)($body['email'] ?? ''));
+        $phoneNumber = trim((string)($body['phoneNumber'] ?? ''));
+        $currentPassword = $body['currentPassword'] ?? '';
+        $newPassword = $body['newPassword'] ?? '';
+        $confirmPassword = $body['confirmPassword'] ?? '';
+
+        if ($customerId <= 0) {
+            respondError('Customer ID is required.');
+        }
+
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            respondError('Invalid email address.');
+        }
+
+        $stmt = $conn->prepare("SELECT username, password FROM customers WHERE customerID = ?");
+        $stmt->bind_param('i', $customerId);
+        executePrepared($stmt, 'Failed to verify account');
+        $result = $stmt->get_result();
+        $account = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$account) {
+            respondError('Customer account not found.', 404);
+        }
+
+        $hashedPassword = null;
+        if ($newPassword !== '' || $confirmPassword !== '' || $currentPassword !== '') {
+            if ($currentPassword === '') {
+                respondError('Current password is required to change password.');
+            }
+            if (!verifyAndUpgradePassword($conn, 'customers', 'customerID', ['id' => $customerId, 'password' => $account['password']], $currentPassword)) {
+                respondError('Current password is incorrect.');
+            }
+            if ($newPassword === '' || $confirmPassword === '') {
+                respondError('New password and confirmation are required.');
+            }
+            if ($newPassword !== $confirmPassword) {
+                respondError('New passwords do not match.');
+            }
+
+            validatePassword($newPassword);
+            $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+        }
+
+        if ($hashedPassword !== null) {
+            $stmt = $conn->prepare(
+                "UPDATE customers
+                 SET email = ?, phone_number = ?, password = ?
+                 WHERE customerID = ?"
+            );
+            $stmt->bind_param('sssi', $email, $phoneNumber, $hashedPassword, $customerId);
+        } else {
+            $stmt = $conn->prepare(
+                "UPDATE customers
+                 SET email = ?, phone_number = ?
+                 WHERE customerID = ?"
+            );
+            $stmt->bind_param('ssi', $email, $phoneNumber, $customerId);
+        }
+
+        executePrepared($stmt, 'Failed to update account settings');
+        $stmt->close();
+
+        respond([
+            'success' => true,
+            'user' => [
+                'userID' => $customerId,
+                'username' => $account['username'],
+                'role' => 'customer',
+                'email' => $email,
+                'phone_number' => $phoneNumber,
+            ],
+        ]);
+    },
+];
