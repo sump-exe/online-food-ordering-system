@@ -8,8 +8,13 @@ export async function loadUserMenuData(loadMenuItems, loadUserOrders) {
 }
 
 export function renderCustomerPage() {
+    const searchTerm = state.customerMenuSearch.trim().toLowerCase();
     const categoryMap = {};
     for (const item of state.menuItems) {
+        if (searchTerm && !String(item.name || '').toLowerCase().includes(searchTerm)) {
+            continue;
+        }
+
         const category = item.category_name || 'Other';
         if (!categoryMap[category]) {
             categoryMap[category] = [];
@@ -117,7 +122,16 @@ export function renderCustomerPage() {
 
         <div class="panel customer-menu-panel">
             <h2>Our Menu</h2>
-            ${menuSectionsHtml || '<p style="text-align:center;color:#aaa;padding:40px 0;">No items available.</p>'}
+            <div class="form-group" style="max-width:420px;margin-bottom:20px;">
+                <label for="customerMenuSearch">Search Item</label>
+                <input
+                    type="text"
+                    id="customerMenuSearch"
+                    placeholder="Search for a menu item"
+                    value="${escapeHtml(state.customerMenuSearch)}"
+                >
+            </div>
+            ${menuSectionsHtml || '<p style="text-align:center;color:#aaa;padding:40px 0;">No matching items found.</p>'}
         </div>
     </div>`;
 }
@@ -144,6 +158,28 @@ export function attachCustomerEvents(callbacks) {
 
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) logoutBtn.addEventListener('click', () => logout(renderApp));
+
+    const searchInput = document.getElementById('customerMenuSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            const nextValue = this.value;
+            const selectionStart = this.selectionStart ?? nextValue.length;
+            const selectionEnd = this.selectionEnd ?? nextValue.length;
+
+            state.customerMenuSearch = this.value;
+            renderInPlace();
+
+            window.requestAnimationFrame(() => {
+                const nextInput = document.getElementById('customerMenuSearch');
+                if (!nextInput) {
+                    return;
+                }
+
+                nextInput.focus();
+                nextInput.setSelectionRange(selectionStart, selectionEnd);
+            });
+        });
+    }
 
     // Highlight the active category in the sidebar as the user scrolls
     const sections = document.querySelectorAll('.customer-menu-section');

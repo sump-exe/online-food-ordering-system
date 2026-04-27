@@ -30,6 +30,7 @@ export const state = {
         user: '',
         status: '',
     },
+    customerMenuSearch: '',
     currentResetToken: null,
     currentResetUsername: null,
     isOrderHistoryOpen: false,
