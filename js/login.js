@@ -13,6 +13,10 @@ export async function login(username, password) {
 }
 
 export function logout(renderApp) {
+    if (!window.confirm('Are you sure you want to log out?')) {
+        return;
+    }
+
     state.currentUser = null;
     state.customerCart = [];
     state.currentPage = 'login';
