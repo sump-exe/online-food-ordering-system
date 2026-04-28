@@ -12,6 +12,7 @@ import { attachAdminOrderEvents, loadAdminOrders, renderAdminOrdersPage } from '
 import { loadUsers, renderAdminUsersPage } from './users-management-admin.js';
 import { loadUserOrders } from './order-history-user.js';
 import { attachCustomerEvents, renderCustomerPage } from './menu-user.js';
+import { loadCartFromDb } from './cart-user.js';
 
 function syncHistoryState() {
     if (typeof window === 'undefined') {
@@ -144,6 +145,7 @@ export async function renderApp() {
                 loadMenuItems(),
                 loadCategories(),
                 loadUserOrders(state.currentUser.userID),
+                loadCartFromDb(),
             ]);
         }
     } catch (error) {

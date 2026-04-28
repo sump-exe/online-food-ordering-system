@@ -30,6 +30,8 @@ $actionMap = [
     'getAccountSettings' => ['group' => 'login', 'handler' => 'getAccountSettings'],
     'updateAccountSettings' => ['group' => 'login', 'handler' => 'updateAccountSettings'],
     'deleteAccount' => ['group' => 'login', 'handler' => 'deleteAccount'],
+    'saveCartToDb' => ['group' => 'cart_user', 'handler' => 'saveCartToDb'],
+    'loadCartFromDb' => ['group' => 'cart_user', 'handler' => 'loadCartFromDb'],
     'createOrder' => ['group' => 'cart_user', 'handler' => 'createOrder'],
     'getOrders' => [
         'group' => isset($_GET['customerId']) ? 'order_history_user' : 'order_history_admin',
