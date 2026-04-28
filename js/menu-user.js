@@ -37,31 +37,42 @@ export function renderCustomerPage() {
 
     const menuSectionsHtml = categoryNames.map((category) => {
         const items = categoryMap[category];
-        const rowsHtml = items.map((item) => {
+        const cardsHtml = items.map((item) => {
             const outOfStock = item.stock === 0;
             const inCart = state.customerCart.find((cartItem) => cartItem.ItemID === item.itemID);
+            const imageHtml = item.image_url
+                ? `<img class="customer-menu-card-image" src="${item.image_url}" alt="${escapeHtml(item.name)}">`
+                : `<div class="customer-menu-card-image customer-menu-card-image-placeholder">No Image</div>`;
 
             return `
-            <div class="menu-row${outOfStock ? '" style="opacity:0.45;' : '"'}">
-                <span>
-                    <strong>${escapeHtml(item.name)}</strong><br>
-                    <small>P${(item.price / 100).toFixed(2)} | Stock: ${item.stock}</small>
-                </span>
-                ${outOfStock
-                    ? '<button disabled style="opacity:0.5;cursor:not-allowed;">Out of Stock</button>'
-                    : inCart
-                        ? `<div style="display:flex;align-items:center;gap:8px;">
-                            <button class="qtyDownBtn" data-id="${item.itemID}" style="width:30px;height:30px;padding:0;border-radius:50%;background:#fff3ec;border:1.5px solid #ffd4bc;color:#ff5722;font-weight:700;font-size:1rem;cursor:pointer;">&#8722;</button>
-                            <span style="font-weight:700;min-width:20px;text-align:center;">${inCart.quantity}</span>
-                            <button class="qtyUpBtn" data-id="${item.itemID}" style="width:30px;height:30px;padding:0;border-radius:50%;background:#fff3ec;border:1.5px solid #ffd4bc;color:#ff5722;font-weight:700;font-size:1rem;cursor:pointer;">+</button>
-                           </div>`
-                        : `<button class="addToCartBtn btn-primary"
+            <article class="customer-menu-card${outOfStock ? ' out-of-stock' : ''}">
+                <div class="customer-menu-card-media">
+                    ${imageHtml}
+                </div>
+                <div class="customer-menu-card-body">
+                    <div class="customer-menu-card-text">
+                        <strong class="customer-menu-card-title">${escapeHtml(item.name)}</strong>
+                        <div class="customer-menu-card-price">P${(item.price / 100).toFixed(2)}</div>
+                    </div>
+                    <div class="customer-menu-card-footer">
+                        <span class="customer-menu-card-stock">${outOfStock ? 'Out of Stock' : `Stock: ${item.stock}`}</span>
+                        ${outOfStock
+                            ? '<button disabled class="customer-menu-card-button">Out of Stock</button>'
+                            : inCart
+                                ? `<div class="customer-menu-card-qty">
+                                    <button class="qtyDownBtn" data-id="${item.itemID}" type="button">&#8722;</button>
+                                    <span>${inCart.quantity}</span>
+                                    <button class="qtyUpBtn" data-id="${item.itemID}" type="button">+</button>
+                                   </div>`
+                                : `<button class="addToCartBtn btn-primary customer-menu-card-button"
                                 data-id="${item.itemID}"
                                 data-name="${escapeHtml(item.name)}"
                                 data-price="${item.price}"
                                 data-stock="${item.stock}">Add to Cart</button>`
-                }
-            </div>`;
+                        }
+                    </div>
+                </div>
+            </article>`;
         }).join('');
 
         return `
@@ -73,7 +84,7 @@ export function renderCustomerPage() {
                 </div>
                 <span class="customer-menu-section-total">${items.length} item${items.length === 1 ? '' : 's'}</span>
             </div>
-            ${rowsHtml}
+            <div class="customer-menu-grid">${cardsHtml}</div>
         </section>`;
     }).join('');
 
