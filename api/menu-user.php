@@ -7,15 +7,21 @@ $userMenuActions = [
                     COALESCE(m.name, CONCAT('Item #', m.itemID)) AS name,
                     m.price,
                     m.stock,
-                    COALESCE(m.categoryID, m.category_id) AS categoryID,
+                    m.categoryID AS categoryID,
                     c.name AS category_name,
                     (m.stock > 0) AS available,
                     m.timeToPrepare
              FROM menu_items m
-             LEFT JOIN categories c ON c.categoryID = COALESCE(m.categoryID, m.category_id)
+             LEFT JOIN categories c ON c.categoryID = m.categoryID
              ORDER BY m.itemID"
         );
-        respond(fetchAllRows($result, ['itemID', 'price', 'stock', 'categoryID'], ['available']));
+        $items = fetchAllRows($result, ['itemID', 'price', 'stock', 'categoryID'], ['available']);
+        foreach ($items as &$item) {
+            $item['image_url'] = getMenuItemImageUrl($item['itemID']);
+        }
+        unset($item);
+
+        respond($items);
     },
     'getCategories' => function ($conn, $body) {
         $result = $conn->query("SELECT categoryID, name FROM categories ORDER BY categoryID");

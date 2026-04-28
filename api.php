@@ -41,6 +41,7 @@ $actionMap = [
     'getMenuItems' => ['group' => 'menu_user', 'handler' => 'getMenuItems'],
     'getCategories' => ['group' => 'menu_user', 'handler' => 'getCategories'],
     'addMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'addMenuItem'],
+    'updateMenuItemImage' => ['group' => 'menu_inventory_admin', 'handler' => 'updateMenuItemImage'],
     'updateStock' => ['group' => 'menu_inventory_admin', 'handler' => 'updateStock'],
     'updatePrice' => ['group' => 'menu_inventory_admin', 'handler' => 'updatePrice'],
     'getAdminSalesReport' => ['group' => 'sales_report_admin', 'handler' => 'getAdminSalesReport'],

@@ -22,3 +22,15 @@ export async function apiPost(action, body = {}) {
     }
     return data;
 }
+
+export async function apiPostFormData(action, formData) {
+    const res = await fetch(`${API}?action=${action}`, {
+        method: 'POST',
+        body: formData,
+    });
+    const data = await res.json();
+    if (data.error) {
+        throw new Error(data.error);
+    }
+    return data;
+}

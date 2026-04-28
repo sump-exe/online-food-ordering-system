@@ -135,6 +135,36 @@ function respondSuccess() {
     respond(['success' => true]);
 }
 
+function getMenuItemImageDirectory() {
+    return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'img';
+}
+
+function ensureMenuItemImageDirectory() {
+    $directory = getMenuItemImageDirectory();
+    if (!is_dir($directory) && !mkdir($directory, 0777, true) && !is_dir($directory)) {
+        respondError('Failed to create image directory.', 500);
+    }
+    return $directory;
+}
+
+function findMenuItemImageFilePath($itemId) {
+    $matches = glob(getMenuItemImageDirectory() . DIRECTORY_SEPARATOR . 'menu-item-' . (int)$itemId . '.*');
+    if (!$matches) {
+        return null;
+    }
+
+    sort($matches, SORT_NATURAL | SORT_FLAG_CASE);
+    return $matches[0];
+}
+
+function getMenuItemImageUrl($itemId) {
+    $filePath = findMenuItemImageFilePath($itemId);
+    if (!$filePath) {
+        return null;
+    }
+
+    return 'img/' . rawurlencode(basename($filePath)) . '?v=' . filemtime($filePath);
+}
+
 $body = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = $_GET['action'] ?? '';
-

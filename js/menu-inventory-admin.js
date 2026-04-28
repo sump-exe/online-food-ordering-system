@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './api.js';
+import { apiGet, apiPost, apiPostFormData } from './api.js';
 import { state } from './state.js';
 
 export async function loadMenuItems() {
@@ -42,11 +42,18 @@ export function renderAdminNavBar() {
 export function renderAdminMenuPage() {
     const rowsHtml = state.menuItems.map((item) => `
         <tr>
-            <td><strong>${item.name}</strong></td>
-            <td>${item.category_name || '-'}</td>
+            <td>
+                ${item.image_url
+                    ? `<img src="${item.image_url}" alt="${escapeHtml(item.name)}" style="width:72px;height:72px;object-fit:cover;border-radius:14px;border:1px solid #f1d2bc;background:#fff;">`
+                    : '<div style="width:72px;height:72px;border-radius:14px;border:1px dashed #d6b8a8;background:#fff7f0;color:#a27d6b;display:flex;align-items:center;justify-content:center;font-size:0.78rem;font-weight:700;">No image</div>'}
+            </td>
+            <td><strong>${escapeHtml(item.name)}</strong></td>
+            <td>${escapeHtml(item.category_name || '-')}</td>
             <td>${item.stock}</td>
             <td>P${(item.price / 100).toFixed(2)}</td>
             <td class="menu-actions-cell">
+                <input type="file" class="updateImageInput" data-id="${item.itemID}" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none;">
+                <button class="updateImageBtn btn-secondary small-btn" data-id="${item.itemID}">Upload Image</button>
                 <button class="editStockBtn btn-secondary small-btn" data-id="${item.itemID}" data-stock="${item.stock}">Update Stock</button>
                 <button class="editPriceBtn btn-secondary small-btn" data-id="${item.itemID}" data-price="${item.price}">Update Price</button>
             </td>
@@ -81,6 +88,10 @@ export function renderAdminMenuPage() {
                     <label>Category</label>
                     <select id="newItemCategory">${categoryOptions}</select>
                 </div>
+                <div class="form-group" style="flex:1.4;min-width:180px;margin-bottom:0;">
+                    <label>Item Image</label>
+                    <input type="file" id="newItemImage" accept="image/jpeg,image/png,image/gif,image/webp">
+                </div>
                 <button id="addItemBtn" class="btn-primary" style="padding:12px 24px;white-space:nowrap;">Add Item</button>
             </div>
         </div>
@@ -89,14 +100,15 @@ export function renderAdminMenuPage() {
             <div style="overflow-x:auto;">
                 <table class="menu-inventory-table">
                     <colgroup>
-                        <col style="width: 32%;">
-                        <col style="width: 21%;">
+                        <col style="width: 12%;">
+                        <col style="width: 24%;">
+                        <col style="width: 18%;">
                         <col style="width: 10%;">
-                        <col style="width: 13%;">
+                        <col style="width: 12%;">
                         <col style="width: 24%;">
                     </colgroup>
-                    <thead><tr><th>Item</th><th>Category</th><th>QTY</th><th>Price</th><th class="menu-actions-header">Action</th></tr></thead>
-                    <tbody>${rowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No items found.</td></tr>'}</tbody>
+                    <thead><tr><th>Image</th><th>Item</th><th>Category</th><th>QTY</th><th>Price</th><th class="menu-actions-header">Action</th></tr></thead>
+                    <tbody>${rowsHtml || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:24px;">No items found.</td></tr>'}</tbody>
                 </table>
             </div>
         </div>
@@ -112,7 +124,24 @@ async function updatePrice(itemId, newPrice) {
 }
 
 async function addMenuItem(payload) {
-    await apiPost('addMenuItem', payload);
+    await apiPostFormData('addMenuItem', payload);
+}
+
+async function updateMenuItemImage(itemId, file) {
+    const formData = new FormData();
+    formData.append('itemId', String(itemId));
+    formData.append('image', file);
+    await apiPostFormData('updateMenuItemImage', formData);
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 export function attachAdminMenuInventoryEvents(callbacks) {
@@ -156,6 +185,29 @@ export function attachAdminMenuInventoryEvents(callbacks) {
         });
     });
 
+    document.querySelectorAll('.updateImageBtn').forEach((btn) => {
+        btn.addEventListener('click', function () {
+            const input = document.querySelector(`.updateImageInput[data-id="${this.dataset.id}"]`);
+            input?.click();
+        });
+    });
+
+    document.querySelectorAll('.updateImageInput').forEach((input) => {
+        input.addEventListener('change', function () {
+            const file = this.files?.[0];
+            if (!file) {
+                return;
+            }
+
+            updateMenuItemImage(parseInt(this.dataset.id, 10), file)
+                .then(() => renderApp())
+                .catch((error) => alert(error.message))
+                .finally(() => {
+                    this.value = '';
+                });
+        });
+    });
+
     const addBtn = document.getElementById('addItemBtn');
     if (addBtn) {
         addBtn.addEventListener('click', () => {
@@ -163,13 +215,23 @@ export function attachAdminMenuInventoryEvents(callbacks) {
             const price = parseInt(document.getElementById('newItemPrice').value, 10);
             const stock = parseInt(document.getElementById('newItemStock').value, 10);
             const categoryID = parseInt(document.getElementById('newItemCategory').value, 10);
+            const imageFile = document.getElementById('newItemImage').files?.[0] ?? null;
 
             if (!name || Number.isNaN(price) || Number.isNaN(stock)) {
                 alert('Please fill all fields');
                 return;
             }
 
-            addMenuItem({ name, price, stock, categoryID })
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('price', String(price));
+            formData.append('stock', String(stock));
+            formData.append('categoryID', String(categoryID));
+            if (imageFile) {
+                formData.append('image', imageFile);
+            }
+
+            addMenuItem(formData)
                 .then(() => renderApp())
                 .catch((error) => alert(error.message));
         });
