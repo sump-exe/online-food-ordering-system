@@ -54,6 +54,10 @@ export async function verifyResetToken(token, username) {
     }
 }
 
+export async function deleteAccount(customerId, password) {
+    return apiPost('deleteAccount', { customerId, password });
+}
+
 export function showRegisterPage(renderInPlace) {
     state.currentPage = 'register';
     renderInPlace();

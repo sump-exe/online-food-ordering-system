@@ -293,4 +293,59 @@ $loginActions = [
             ],
         ]);
     },
+    'deleteAccount' => function ($conn, $body) {
+        $customerId = (int)($body['customerId'] ?? 0);
+        $password = $body['password'] ?? '';
+
+        if ($customerId <= 0) {
+            respondError('Customer ID is required.');
+        }
+        if ($password === '') {
+            respondError('Password is required to delete account.');
+        }
+
+        $stmt = $conn->prepare("SELECT customerID, username, password FROM customers WHERE customerID = ?");
+        $stmt->bind_param('i', $customerId);
+        executePrepared($stmt, 'Failed to verify account');
+        $result = $stmt->get_result();
+        $account = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$account) {
+            respondError('Customer account not found.', 404);
+        }
+
+        if (!password_verify($password, $account['password'])) {
+            respondError('Incorrect password.');
+        }
+
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("DELETE FROM orderitems WHERE OrderID IN (SELECT OrderID FROM orders WHERE customerID = ?)");
+            $stmt->bind_param('i', $customerId);
+            $stmt->execute();
+            $stmt->close();
+
+            $stmt = $conn->prepare("DELETE FROM payments WHERE customerID = ?");
+            $stmt->bind_param('i', $customerId);
+            $stmt->execute();
+            $stmt->close();
+
+            $stmt = $conn->prepare("DELETE FROM orders WHERE customerID = ?");
+            $stmt->bind_param('i', $customerId);
+            $stmt->execute();
+            $stmt->close();
+
+            $stmt = $conn->prepare("DELETE FROM customers WHERE customerID = ?");
+            $stmt->bind_param('i', $customerId);
+            $stmt->execute();
+            $stmt->close();
+
+            $conn->commit();
+            respond(['success' => true, 'message' => 'Account deleted successfully.']);
+        } catch (Exception $e) {
+            $conn->rollback();
+            respondError('Failed to delete account: ' . $e->getMessage());
+        }
+    },
 ];

@@ -2,6 +2,7 @@ import { apiGet, apiPost } from './api.js';
 import { state } from './state.js';
 import { addToCart, getCartTotal, placeOrder, removeFromCart, updateQuantity } from './cart-user.js';
 import { cancelOrder, renderUserOrdersRows } from './order-history-user.js';
+import { deleteAccount } from './login.js';
 
 export async function loadUserMenuData(loadMenuItems, loadUserOrders) {
     await Promise.all([loadMenuItems(), loadUserOrders(state.currentUser.userID)]);
@@ -519,6 +520,11 @@ async function openAccountSettingsDrawer(renderInPlace) {
                 </div>
             </div>
             <button class="btn-primary" id="saveAccountSettingsBtn" style="width:100%;padding:14px;">Save Changes</button>
+            <div style="margin-top:24px;padding-top:18px;border-top:2px solid #ffe0c4;">
+                <div style="font-weight:700;color:#dc2626;margin-bottom:12px;">Danger Zone</div>
+                <p style="color:#666;font-size:0.9rem;margin-bottom:12px;">Once you delete your account, there is no going back. Please be certain.</p>
+                <button class="btn-danger" id="deleteAccountBtn" style="width:100%;padding:14px;background:#dc2626;color:#fff;border:none;border-radius:8px;cursor:pointer;">Delete My Account</button>
+            </div>
         </div>
     </aside>`;
 
@@ -551,6 +557,32 @@ async function openAccountSettingsDrawer(renderInPlace) {
                 closeDrawer();
                 renderInPlace();
             }, 900);
+        } catch (error) {
+            msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        }
+    });
+
+    document.getElementById('deleteAccountBtn')?.addEventListener('click', async () => {
+        const password = prompt('Please enter your password to confirm account deletion:');
+        if (!password) {
+            return;
+        }
+
+        if (!confirm('Are you absolutely sure you want to delete your account? This action cannot be undone.')) {
+            return;
+        }
+
+        const msgDiv = document.getElementById('accountSettingsMessage');
+
+        try {
+            await deleteAccount(state.currentUser.userID, password);
+            alert('Your account has been deleted successfully.');
+            state.currentUser = null;
+            state.customerCart = [];
+            state.currentPage = 'login';
+            state.firstLoad = true;
+            closeDrawer();
+            renderInPlace();
         } catch (error) {
             msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
         }
