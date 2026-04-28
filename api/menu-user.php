@@ -9,8 +9,7 @@ $userMenuActions = [
                     m.stock,
                     m.categoryID AS categoryID,
                     c.name AS category_name,
-                    (m.stock > 0) AS available,
-                    m.timeToPrepare
+                    (m.stock > 0) AS available
              FROM menu_items m
              LEFT JOIN categories c ON c.categoryID = m.categoryID
              ORDER BY m.itemID"

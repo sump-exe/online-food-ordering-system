@@ -92,7 +92,7 @@ $adminMenuInventoryActions = [
         }
 
         $stmt = $conn->prepare(
-            "INSERT INTO menu_items (name, price, stock, categoryID, timeToPrepare) VALUES (?, ?, ?, ?, NOW())"
+            "INSERT INTO menu_items (name, price, stock, categoryID) VALUES (?, ?, ?, ?)"
         );
         $stmt->bind_param('siii', $name, $price, $stock, $categoryID);
         executePrepared($stmt, 'Failed to add item');
