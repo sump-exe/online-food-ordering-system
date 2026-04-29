@@ -125,6 +125,43 @@ $userCartActions = [
         ]);
     },
     'createOrder' => function ($conn, $body) {
+        $customerId = (int)($body['customerId'] ?? 0);
+        $totalPayment = (int)($body['totalPayment'] ?? 0);
+        $method = $body['method'] ?? '';
+        $reference = $body['reference'] ?? null;
+
+        if (!$customerId) {
+            respondError('Customer ID is required.');
+        }
+        if ($totalPayment <= 0) {
+            respondError('Invalid total payment.');
+        }
+        if (!in_array($method, ['cod', 'gcash', 'card'])) {
+            respondError('Invalid payment method.');
+        }
+        if ($method !== 'cod' && empty($reference)) {
+            respondError('Payment reference required for digital payments.');
+        }
+
+        // Validate/generate reference
+        if ($method === 'cod') {
+            $refNum = 'COD-' . strtoupper(substr(uniqid(), -6));
+        } else {
+            $refNum = preg_replace('/[^A-Za-z0-9]/', '', $reference);
+            if (strlen($refNum) < 6) {
+                respondError('Payment reference too short.');
+            }
+        }
+
+        respond([
+            'success' => true,
+            'message' => 'Payment confirmed',
+            'referenceNumber' => $refNum,
+            'method' => $method,
+            'totalPayment' => $totalPayment
+        ]);
+    },
+    'createOrder' => function ($conn, $body) {
         $customerId   = (int)($body['customerId'] ?? 0);
         $totalPayment = (int)($body['totalPayment'] ?? 0);
         $cartItems    = $body['cartItems'] ?? [];

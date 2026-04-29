@@ -114,6 +114,32 @@ export function getCartTotal() {
     return state.customerCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 }
 
+export async function confirmPayment(renderApp) {
+    if (!state.currentUser || state.currentUser.role !== 'customer') {
+        throw new Error('Please login as customer');
+    }
+    if (state.customerCart.length === 0) {
+        throw new Error('Cart is empty');
+    }
+
+    const totalAmount = getCartTotal();
+    const cartItems = state.customerCart.map((item) => ({
+        itemID: item.ItemID,
+        quantity: item.quantity,
+        price: item.price,
+    }));
+
+    const result = await apiPost('createOrder', {
+        customerId: state.currentUser.userID,
+        totalPayment: totalAmount,
+        cartItems
+    });
+
+    state.customerCart = [];
+    return result;
+}
+
+
 export async function placeOrder(renderApp) {
     if (!state.currentUser || state.currentUser.role !== 'customer') {
         alert('Please login as customer');
