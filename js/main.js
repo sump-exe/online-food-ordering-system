@@ -2,56 +2,21 @@ import { state } from './state.js';
 import { checkForResetToken, logout, renderAuthScreen } from './login.js';
 import {
     attachAdminMenuInventoryEvents,
-    loadCategories,
+    loadCategories as loadFoodCategories,
     loadMenuItems,
     renderAdminMenuPage,
     renderAdminNavBar,
 } from './menu-inventory-admin.js';
-import { attachAdminSalesEvents, loadAdminSalesData, renderAdminSalesPage } from './sales-report-admin.js';
+import { loadAdminSalesData, renderAdminSalesPage } from './sales-report-admin.js';
 import { attachAdminOrderEvents, loadAdminOrders, renderAdminOrdersPage } from './order-history-admin.js';
 import { loadUsers, renderAdminUsersPage } from './users-management-admin.js';
 import { loadUserOrders } from './order-history-user.js';
 import { attachCustomerEvents, renderCustomerPage } from './menu-user.js';
-
-function syncHistoryState() {
-    if (typeof window === 'undefined') {
-        return;
-    }
-
-    if (state.currentUser) {
-        if (!window.history.state?.appAuthLocked) {
-            window.history.pushState({ appAuthLocked: true }, '', window.location.href);
-        }
-        return;
-    }
-
-    if (!window.history.state) {
-        window.history.replaceState({ appAuthLocked: false }, '', window.location.href);
-        return;
-    }
-
-    if (window.history.state.appAuthLocked) {
-        window.history.replaceState({ appAuthLocked: false }, '', window.location.href);
-    }
-}
-
-function attachHistoryGuard() {
-    if (typeof window === 'undefined' || window.__foodieDashHistoryGuardAttached) {
-        return;
-    }
-
-    window.__foodieDashHistoryGuardAttached = true;
-    syncHistoryState();
-
-    window.addEventListener('popstate', () => {
-        if (!state.currentUser) {
-            return;
-        }
-
-        window.history.pushState({ appAuthLocked: true }, '', window.location.href);
-        renderInPlace();
-    });
-}
+import { 
+    loadCategories as loadAdminCategories, 
+    renderAdminCategoriesPage, 
+    attachCategoryEvents 
+} from './category-management-admin.js';
 
 function getRoot() {
     return document.getElementById('app');
@@ -65,6 +30,9 @@ export function setAdminPage(page) {
 function renderAdminPageContent() {
     if (state.adminPage === 'menu') {
         return renderAdminMenuPage();
+    }
+    if (state.adminPage === 'categories') {
+        return renderAdminCategoriesPage();
     }
     if (state.adminPage === 'orders') {
         return renderAdminOrdersPage();
@@ -92,8 +60,6 @@ export function renderInPlace() {
         return;
     }
 
-    syncHistoryState();
-
     if (!state.currentUser) {
         renderAuthScreen(root, { renderApp, renderInPlace });
         return;
@@ -102,11 +68,21 @@ export function renderInPlace() {
     if (state.currentUser.role === 'admin') {
         root.innerHTML = renderAdminLayout();
         attachAdminMenuInventoryEvents({ renderApp, setAdminPage, logout });
-        if (state.adminPage === 'orders') {
-            attachAdminOrderEvents({ renderApp, renderInPlace });
+        
+        if (state.adminPage === 'categories') {
+            attachCategoryEvents({ 
+                renderApp, 
+                refreshCategories: async () => {
+                    await loadAdminCategories();
+                },
+                setAdminMessage: (msg, type) => {
+                    console.log(`${type}: ${msg}`);
+                }
+            });
         }
-        if (state.adminPage === 'sales') {
-            attachAdminSalesEvents(renderApp);
+        
+        if (state.adminPage === 'orders') {
+            attachAdminOrderEvents(renderApp);
         }
         return;
     }
@@ -134,7 +110,8 @@ export async function renderApp() {
         if (state.currentUser.role === 'admin') {
             await Promise.all([
                 loadMenuItems(),
-                loadCategories(),
+                loadFoodCategories(),
+                loadAdminCategories(),
                 loadAdminOrders(),
                 loadAdminSalesData(),
                 loadUsers(),
@@ -142,7 +119,6 @@ export async function renderApp() {
         } else {
             await Promise.all([
                 loadMenuItems(),
-                loadCategories(),
                 loadUserOrders(state.currentUser.userID),
             ]);
         }
@@ -156,7 +132,6 @@ export async function renderApp() {
 }
 
 export async function initializeApp() {
-    attachHistoryGuard();
     await checkForResetToken(renderInPlace);
     renderApp();
 }

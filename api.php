@@ -9,6 +9,7 @@ require __DIR__ . '/api/menu-inventory-admin.php';
 require __DIR__ . '/api/sales-report-admin.php';
 require __DIR__ . '/api/order-history-admin.php';
 require __DIR__ . '/api/users-management-admin.php';
+require __DIR__ . '/api/category-management-admin.php';
 
 $routes = [
     'login' => $loginActions,
@@ -19,6 +20,7 @@ $routes = [
     'sales_report_admin' => $adminSalesReportActions,
     'order_history_admin' => $adminOrderHistoryActions,
     'users_management_admin' => $adminUsersManagementActions,
+    'category_management_admin' => $adminCategoryActions,
 ];
 
 $actionMap = [
@@ -27,9 +29,6 @@ $actionMap = [
     'forgotPassword' => ['group' => 'login', 'handler' => 'forgotPassword'],
     'resetPassword' => ['group' => 'login', 'handler' => 'resetPassword'],
     'verifyResetToken' => ['group' => 'login', 'handler' => 'verifyResetToken'],
-    'getAccountSettings' => ['group' => 'login', 'handler' => 'getAccountSettings'],
-    'updateAccountSettings' => ['group' => 'login', 'handler' => 'updateAccountSettings'],
-    'deleteAccount' => ['group' => 'login', 'handler' => 'deleteAccount'],
     'createOrder' => ['group' => 'cart_user', 'handler' => 'createOrder'],
     'getOrders' => [
         'group' => isset($_GET['customerId']) ? 'order_history_user' : 'order_history_admin',
@@ -42,11 +41,18 @@ $actionMap = [
     'getMenuItems' => ['group' => 'menu_user', 'handler' => 'getMenuItems'],
     'getCategories' => ['group' => 'menu_user', 'handler' => 'getCategories'],
     'addMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'addMenuItem'],
-    'updateMenuItemImage' => ['group' => 'menu_inventory_admin', 'handler' => 'updateMenuItemImage'],
     'updateStock' => ['group' => 'menu_inventory_admin', 'handler' => 'updateStock'],
     'updatePrice' => ['group' => 'menu_inventory_admin', 'handler' => 'updatePrice'],
-    'getAdminSalesReport' => ['group' => 'sales_report_admin', 'handler' => 'getAdminSalesReport'],
+    'getSalesReport' => ['group' => 'sales_report_admin', 'handler' => 'getSalesReport'],
+    'getOrderStats' => ['group' => 'sales_report_admin', 'handler' => 'getOrderStats'],
+    'getSalesByDate' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByDate'],
+    'getSalesByCustomer' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByCustomer'],
     'getUsers' => ['group' => 'users_management_admin', 'handler' => 'getUsers'],
+    // Category Management Actions
+    'getAdminCategories' => ['group' => 'category_management_admin', 'handler' => 'getCategories'],
+    'addCategory' => ['group' => 'category_management_admin', 'handler' => 'addCategory'],
+    'updateCategory' => ['group' => 'category_management_admin', 'handler' => 'updateCategory'],
+    'deleteCategory' => ['group' => 'category_management_admin', 'handler' => 'deleteCategory'],
 ];
 
 if (!isset($actionMap[$action])) {
