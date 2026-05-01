@@ -12,13 +12,11 @@ import { attachAdminOrderEvents, loadAdminOrders, renderAdminOrdersPage } from '
 import { loadUsers, renderAdminUsersPage } from './users-management-admin.js';
 import { loadUserOrders } from './order-history-user.js';
 import { attachCustomerEvents, renderCustomerPage } from './menu-user.js';
-<<<<<<< HEAD
 import { 
     loadCategories as loadAdminCategories, 
     renderAdminCategoriesPage, 
     attachCategoryEvents 
 } from './category-management-admin.js';
-=======
 import { loadCartFromDb } from './cart-user.js';
 
 function syncHistoryState() {
@@ -60,7 +58,6 @@ function attachHistoryGuard() {
         renderInPlace();
     });
 }
->>>>>>> 71abe9111994d7c8321be6b0b6c878590d9d5c70
 
 function getRoot() {
     return document.getElementById('app');
@@ -178,5 +175,6 @@ export async function renderApp() {
 
 export async function initializeApp() {
     await checkForResetToken(renderInPlace);
-    renderApp();
+    attachHistoryGuard();
+    await renderApp();
 }

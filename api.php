@@ -29,14 +29,11 @@ $actionMap = [
     'forgotPassword' => ['group' => 'login', 'handler' => 'forgotPassword'],
     'resetPassword' => ['group' => 'login', 'handler' => 'resetPassword'],
     'verifyResetToken' => ['group' => 'login', 'handler' => 'verifyResetToken'],
-<<<<<<< HEAD
-=======
     'getAccountSettings' => ['group' => 'login', 'handler' => 'getAccountSettings'],
     'updateAccountSettings' => ['group' => 'login', 'handler' => 'updateAccountSettings'],
     'deleteAccount' => ['group' => 'login', 'handler' => 'deleteAccount'],
     'saveCartToDb' => ['group' => 'cart_user', 'handler' => 'saveCartToDb'],
     'loadCartFromDb' => ['group' => 'cart_user', 'handler' => 'loadCartFromDb'],
->>>>>>> 71abe9111994d7c8321be6b0b6c878590d9d5c70
     'createOrder' => ['group' => 'cart_user', 'handler' => 'createOrder'],
     'getOrders' => [
         'group' => isset($_GET['customerId']) ? 'order_history_user' : 'order_history_admin',
@@ -52,6 +49,7 @@ $actionMap = [
     'updateStock' => ['group' => 'menu_inventory_admin', 'handler' => 'updateStock'],
     'updatePrice' => ['group' => 'menu_inventory_admin', 'handler' => 'updatePrice'],
     'getSalesReport' => ['group' => 'sales_report_admin', 'handler' => 'getSalesReport'],
+    'getAdminSalesReport' => ['group' => 'sales_report_admin', 'handler' => 'getAdminSalesReport'],
     'getOrderStats' => ['group' => 'sales_report_admin', 'handler' => 'getOrderStats'],
     'getSalesByDate' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByDate'],
     'getSalesByCustomer' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByCustomer'],
