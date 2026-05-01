@@ -1,6 +1,60 @@
 import { apiPost } from './api.js';
 import { state } from './state.js';
 
+let cartSaveTimeout = null;
+
+async function syncCartToDb() {
+    if (!state.currentUser || state.currentUser.role !== 'customer') {
+        return;
+    }
+    if (state.customerCart.length === 0) {
+        return;
+    }
+
+    const cartItems = state.customerCart.map((item) => ({
+        itemID: item.ItemID,
+        quantity: item.quantity,
+        price: item.price,
+    }));
+
+    try {
+        await apiPost('saveCartToDb', {
+            customerId: state.currentUser.userID,
+            cartItems,
+        });
+    } catch (error) {
+        console.error('Failed to sync cart to DB:', error.message);
+    }
+}
+
+function debouncedCartSync() {
+    if (cartSaveTimeout) {
+        clearTimeout(cartSaveTimeout);
+    }
+    cartSaveTimeout = setTimeout(syncCartToDb, 500);
+}
+
+export async function loadCartFromDb() {
+    if (!state.currentUser || state.currentUser.role !== 'customer') {
+        return;
+    }
+
+    try {
+        const result = await apiPost('loadCartFromDb', {
+            customerId: state.currentUser.userID,
+        });
+
+        if (result.cartItems && result.cartItems.length > 0) {
+            state.customerCart = result.cartItems;
+        } else {
+            state.customerCart = [];
+        }
+    } catch (error) {
+        console.error('Failed to load cart from DB:', error.message);
+        state.customerCart = [];
+    }
+}
+
 export function addToCart(item, renderInPlace) {
     const existing = state.customerCart.find((entry) => entry.ItemID === item.itemID);
 
@@ -24,11 +78,13 @@ export function addToCart(item, renderInPlace) {
         });
     }
 
+    debouncedCartSync();
     renderInPlace();
 }
 
 export function removeFromCart(itemId, renderInPlace) {
     state.customerCart = state.customerCart.filter((item) => item.ItemID !== itemId);
+    debouncedCartSync();
     renderInPlace();
 }
 
@@ -50,12 +106,39 @@ export function updateQuantity(itemId, delta, renderInPlace) {
         state.customerCart[index].quantity = nextQty;
     }
 
+    debouncedCartSync();
     renderInPlace();
 }
 
 export function getCartTotal() {
     return state.customerCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 }
+
+export async function confirmPayment(renderApp) {
+    if (!state.currentUser || state.currentUser.role !== 'customer') {
+        throw new Error('Please login as customer');
+    }
+    if (state.customerCart.length === 0) {
+        throw new Error('Cart is empty');
+    }
+
+    const totalAmount = getCartTotal();
+    const cartItems = state.customerCart.map((item) => ({
+        itemID: item.ItemID,
+        quantity: item.quantity,
+        price: item.price,
+    }));
+
+    const result = await apiPost('createOrder', {
+        customerId: state.currentUser.userID,
+        totalPayment: totalAmount,
+        cartItems
+    });
+
+    state.customerCart = [];
+    return result;
+}
+
 
 export async function placeOrder(renderApp) {
     if (!state.currentUser || state.currentUser.role !== 'customer') {

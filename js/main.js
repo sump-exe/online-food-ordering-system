@@ -12,11 +12,55 @@ import { attachAdminOrderEvents, loadAdminOrders, renderAdminOrdersPage } from '
 import { loadUsers, renderAdminUsersPage } from './users-management-admin.js';
 import { loadUserOrders } from './order-history-user.js';
 import { attachCustomerEvents, renderCustomerPage } from './menu-user.js';
+<<<<<<< HEAD
 import { 
     loadCategories as loadAdminCategories, 
     renderAdminCategoriesPage, 
     attachCategoryEvents 
 } from './category-management-admin.js';
+=======
+import { loadCartFromDb } from './cart-user.js';
+
+function syncHistoryState() {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (state.currentUser) {
+        if (!window.history.state?.appAuthLocked) {
+            window.history.pushState({ appAuthLocked: true }, '', window.location.href);
+        }
+        return;
+    }
+
+    if (!window.history.state) {
+        window.history.replaceState({ appAuthLocked: false }, '', window.location.href);
+        return;
+    }
+
+    if (window.history.state.appAuthLocked) {
+        window.history.replaceState({ appAuthLocked: false }, '', window.location.href);
+    }
+}
+
+function attachHistoryGuard() {
+    if (typeof window === 'undefined' || window.__foodieDashHistoryGuardAttached) {
+        return;
+    }
+
+    window.__foodieDashHistoryGuardAttached = true;
+    syncHistoryState();
+
+    window.addEventListener('popstate', () => {
+        if (!state.currentUser) {
+            return;
+        }
+
+        window.history.pushState({ appAuthLocked: true }, '', window.location.href);
+        renderInPlace();
+    });
+}
+>>>>>>> 71abe9111994d7c8321be6b0b6c878590d9d5c70
 
 function getRoot() {
     return document.getElementById('app');
@@ -120,6 +164,7 @@ export async function renderApp() {
             await Promise.all([
                 loadMenuItems(),
                 loadUserOrders(state.currentUser.userID),
+                loadCartFromDb(),
             ]);
         }
     } catch (error) {

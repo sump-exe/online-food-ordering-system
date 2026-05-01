@@ -1,6 +1,166 @@
 <?php
 
 $userCartActions = [
+    'saveCartToDb' => function ($conn, $body) {
+        $customerId = (int)($body['customerId'] ?? 0);
+        $cartItems = $body['cartItems'] ?? [];
+
+        if (!$customerId) {
+            respondError('Customer ID is required.');
+        }
+        if (empty($cartItems)) {
+            respondError('Cart is empty.');
+        }
+
+        $conn->begin_transaction();
+        try {
+            // Check for existing cart order
+            $stmt = $conn->prepare("SELECT OrderID FROM orders WHERE customerID = ? AND Status = 'In Cart' ORDER BY OrderID DESC LIMIT 1");
+            $stmt->bind_param('i', $customerId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $cartOrder = $result->fetch_assoc();
+            $stmt->close();
+
+            if ($cartOrder) {
+                // Clear existing cart items
+                $del = $conn->prepare("DELETE FROM orderitems WHERE OrderID = ?");
+                $del->bind_param('i', $cartOrder['OrderID']);
+                $del->execute();
+                $del->close();
+                $orderId = $cartOrder['OrderID'];
+            } else {
+                // Create new cart order
+                $totalPayment = 0;
+                $stmt = $conn->prepare(
+                    "INSERT INTO orders (Status, TotalPayment, customerID, order_date) VALUES ('In Cart', ?, ?, NOW())"
+                );
+                $stmt->bind_param('ii', $totalPayment, $customerId);
+                $stmt->execute();
+                $orderId = $stmt->insert_id;
+                $stmt->close();
+            }
+
+            $totalPayment = 0;
+            foreach ($cartItems as $ci) {
+                $itemId = (int)$ci['itemID'];
+                $qty = (int)$ci['quantity'];
+                $price = (int)$ci['price'];
+
+                if ($qty <= 0 || $price <= 0) {
+                    throw new Exception('Invalid cart item data.');
+                }
+
+                $totalPayment += $price * $qty;
+
+                $oi = $conn->prepare(
+                    "INSERT INTO orderitems (OrderID, ItemID, quantity, price) VALUES (?, ?, ?, ?)"
+                );
+                $oi->bind_param('iiii', $orderId, $itemId, $qty, $price);
+                $oi->execute();
+                $oi->close();
+            }
+
+            // Update total payment
+            $upd = $conn->prepare("UPDATE orders SET TotalPayment = ? WHERE OrderID = ?");
+            $upd->bind_param('ii', $totalPayment, $orderId);
+            $upd->execute();
+            $upd->close();
+
+            $conn->commit();
+            respond([
+                'success' => true,
+                'orderID' => $orderId,
+            ]);
+        } catch (Exception $e) {
+            $conn->rollback();
+            respondError($e->getMessage());
+        }
+    },
+    'loadCartFromDb' => function ($conn, $body) {
+        $customerId = (int)($body['customerId'] ?? 0);
+
+        if (!$customerId) {
+            respondError('Customer ID is required.');
+        }
+
+        // Get cart order
+        $stmt = $conn->prepare("SELECT OrderID FROM orders WHERE customerID = ? AND Status = 'In Cart' ORDER BY OrderID DESC LIMIT 1");
+        $stmt->bind_param('i', $customerId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $cartOrder = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$cartOrder) {
+            respond(['cartItems' => [], 'orderID' => null]);
+        }
+
+        // Get cart items
+        $stmt = $conn->prepare(
+            "SELECT oi.ItemID, oi.quantity, oi.price, mi.name, mi.stock
+             FROM orderitems oi
+             LEFT JOIN menu_items mi ON mi.itemID = oi.ItemID
+             WHERE oi.OrderID = ?"
+        );
+        $stmt->bind_param('i', $cartOrder['OrderID']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $items = fetchAllRows($result, ['ItemID', 'quantity', 'price', 'stock']);
+        $stmt->close();
+
+        $cartItems = array_map(function ($item) {
+            return [
+                'itemID' => $item['ItemID'],
+                'name' => $item['name'],
+                'price' => $item['price'],
+                'quantity' => $item['quantity'],
+                'maxStock' => $item['stock'],
+            ];
+        }, $items);
+
+        respond([
+            'cartItems' => $cartItems,
+            'orderID' => $cartOrder['OrderID'],
+        ]);
+    },
+    'createOrder' => function ($conn, $body) {
+        $customerId = (int)($body['customerId'] ?? 0);
+        $totalPayment = (int)($body['totalPayment'] ?? 0);
+        $method = $body['method'] ?? '';
+        $reference = $body['reference'] ?? null;
+
+        if (!$customerId) {
+            respondError('Customer ID is required.');
+        }
+        if ($totalPayment <= 0) {
+            respondError('Invalid total payment.');
+        }
+        if (!in_array($method, ['cod', 'gcash', 'card'])) {
+            respondError('Invalid payment method.');
+        }
+        if ($method !== 'cod' && empty($reference)) {
+            respondError('Payment reference required for digital payments.');
+        }
+
+        // Validate/generate reference
+        if ($method === 'cod') {
+            $refNum = 'COD-' . strtoupper(substr(uniqid(), -6));
+        } else {
+            $refNum = preg_replace('/[^A-Za-z0-9]/', '', $reference);
+            if (strlen($refNum) < 6) {
+                respondError('Payment reference too short.');
+            }
+        }
+
+        respond([
+            'success' => true,
+            'message' => 'Payment confirmed',
+            'referenceNumber' => $refNum,
+            'method' => $method,
+            'totalPayment' => $totalPayment
+        ]);
+    },
     'createOrder' => function ($conn, $body) {
         $customerId   = (int)($body['customerId'] ?? 0);
         $totalPayment = (int)($body['totalPayment'] ?? 0);
@@ -18,13 +178,33 @@ $userCartActions = [
 
         $conn->begin_transaction();
         try {
-            $stmt = $conn->prepare(
-                "INSERT INTO orders (Status, TotalPayment, customerID, order_date) VALUES ('Preparing', ?, ?, NOW())"
-            );
-            $stmt->bind_param('ii', $totalPayment, $customerId);
+            // Check for existing cart order
+            $stmt = $conn->prepare("SELECT OrderID FROM orders WHERE customerID = ? AND Status = 'In Cart' ORDER BY OrderID DESC LIMIT 1");
+            $stmt->bind_param('i', $customerId);
             $stmt->execute();
-            $orderId = $stmt->insert_id;
+            $result = $stmt->get_result();
+            $cartOrder = $result->fetch_assoc();
             $stmt->close();
+
+            if ($cartOrder) {
+                // Use existing cart order, update status to Preparing
+                $orderId = $cartOrder['OrderID'];
+                
+                // Clear existing cart items
+                $del = $conn->prepare("DELETE FROM orderitems WHERE OrderID = ?");
+                $del->bind_param('i', $orderId);
+                $del->execute();
+                $del->close();
+            } else {
+                // Create new order
+                $stmt = $conn->prepare(
+                    "INSERT INTO orders (Status, TotalPayment, customerID, order_date) VALUES ('Preparing', ?, ?, NOW())"
+                );
+                $stmt->bind_param('ii', $totalPayment, $customerId);
+                $stmt->execute();
+                $orderId = $stmt->insert_id;
+                $stmt->close();
+            }
 
             foreach ($cartItems as $ci) {
                 $itemId = (int)$ci['itemID'];
@@ -38,8 +218,9 @@ $userCartActions = [
                 $chk = $conn->prepare("SELECT stock FROM menu_items WHERE itemID = ? FOR UPDATE");
                 $chk->bind_param('i', $itemId);
                 $chk->execute();
-                $chk->bind_result($currentStock);
-                $chk->fetch();
+                $result = $chk->get_result();
+                $row = $result->fetch_assoc();
+                $currentStock = $row ? $row['stock'] : 0;
                 $chk->close();
 
                 if ($currentStock < $qty) {
@@ -58,6 +239,12 @@ $userCartActions = [
                 $upd->execute();
                 $upd->close();
             }
+
+            // Update order status to Preparing
+            $upd = $conn->prepare("UPDATE orders SET Status = 'Preparing', TotalPayment = ? WHERE OrderID = ?");
+            $upd->bind_param('ii', $totalPayment, $orderId);
+            $upd->execute();
+            $upd->close();
 
             $refNum = rand(100000000, 999999999);
             $pay = $conn->prepare(

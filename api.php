@@ -29,6 +29,14 @@ $actionMap = [
     'forgotPassword' => ['group' => 'login', 'handler' => 'forgotPassword'],
     'resetPassword' => ['group' => 'login', 'handler' => 'resetPassword'],
     'verifyResetToken' => ['group' => 'login', 'handler' => 'verifyResetToken'],
+<<<<<<< HEAD
+=======
+    'getAccountSettings' => ['group' => 'login', 'handler' => 'getAccountSettings'],
+    'updateAccountSettings' => ['group' => 'login', 'handler' => 'updateAccountSettings'],
+    'deleteAccount' => ['group' => 'login', 'handler' => 'deleteAccount'],
+    'saveCartToDb' => ['group' => 'cart_user', 'handler' => 'saveCartToDb'],
+    'loadCartFromDb' => ['group' => 'cart_user', 'handler' => 'loadCartFromDb'],
+>>>>>>> 71abe9111994d7c8321be6b0b6c878590d9d5c70
     'createOrder' => ['group' => 'cart_user', 'handler' => 'createOrder'],
     'getOrders' => [
         'group' => isset($_GET['customerId']) ? 'order_history_user' : 'order_history_admin',

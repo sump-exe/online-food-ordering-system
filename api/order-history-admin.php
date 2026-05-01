@@ -14,6 +14,7 @@ $adminOrderHistoryActions = [
              FROM orders o
              LEFT JOIN payments p ON p.OrderID = o.OrderID
              LEFT JOIN customers c ON c.customerID = o.customerID
+             WHERE o.Status != 'In Cart'
              ORDER BY o.OrderID DESC"
         );
         $orders = fetchAllRows($result, ['OrderID', 'TotalPayment', 'customer_id', 'referenceNumber']);

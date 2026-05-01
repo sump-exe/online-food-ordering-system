@@ -396,12 +396,22 @@ function openCartDrawer(renderInPlace, renderApp) {
 
     const placeBtn = document.getElementById('placeOrderBtn');
     if (placeBtn) {
-        placeBtn.addEventListener('click', async () => {
-            await placeOrder(renderApp);
+        placeBtn.textContent = 'Confirm & Pay';
+        placeBtn.className = 'btn-primary';
+        placeBtn.style.cssText = 'width:100%; padding:16px; font-size:1rem; font-weight:700; margin-top:16px;';
+        placeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             closeCart();
+            import('./payment-confirmation.js').then(module => {
+                module.openPaymentConfirmationDrawer(renderInPlace, renderApp);
+            }).catch(err => {
+                console.error('Failed to load payment confirmation:', err);
+                alert('Payment system temporarily unavailable');
+            });
         });
     }
 }
+
 
 function openOrderHistoryDrawer(renderInPlace, renderApp) {
     const existingDrawer = document.getElementById('orderHistoryDrawer');
