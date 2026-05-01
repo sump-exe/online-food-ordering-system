@@ -177,18 +177,18 @@ $loginActions = [
             respondError('No email address found for this user. Please contact support.');
         }
 
-        // Generate 6-digit OTP
+// Generate 6-digit OTP
         $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $otpExpiry = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 
-        // Delete any existing unused OTPs for this username
-        $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND used = 0");
+        // Delete any existing unused password_reset OTPs for this username
+        $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND used = 0 AND (type = 'password_reset' OR type IS NULL OR type = '')");
         $stmt->bind_param('s', $username);
         $stmt->execute();
         $stmt->close();
 
-        // Insert new OTP
-        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at) VALUES (?, ?, ?, ?)");
+        // Insert new OTP with explicit type
+        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at, type) VALUES (?, ?, ?, ?, 'password_reset')");
         $stmt->bind_param('ssss', $username, $email, $otp, $otpExpiry);
         executePrepared($stmt, 'Failed to create OTP');
         $stmt->close();
@@ -206,34 +206,57 @@ $loginActions = [
             'email' => maskEmail($email),
         ]);
     },
-    'verifyOTP' => function ($conn, $body) {
+'verifyOTP' => function ($conn, $body) {
         $username = $body['username'] ?? '';
         $otp = $body['otp'] ?? '';
+        $email = $body['email'] ?? ''; // Optional: allow email for verification
 
-        if (!$username || !$otp) {
-            respondError('Username and OTP are required.');
+        if ((!$username && !$email) || !$otp) {
+            respondError('Username or email and OTP are required.');
         }
 
         if (strlen($otp) !== 6 || !ctype_digit($otp)) {
             respondError('Invalid OTP format. Please enter a 6-digit code.');
         }
 
-        // Find valid OTP
-        $stmt = $conn->prepare("
-            SELECT id, username, email 
-            FROM password_otps 
-            WHERE username = ? AND otp = ? AND used = 0 AND expires_at > NOW()
-            ORDER BY created_at DESC LIMIT 1
-        ");
-        $stmt->bind_param('ss', $username, $otp);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $otpRecord = $result->fetch_assoc();
-        $stmt->close();
+        // First try to find by username
+        $otpRecord = null;
+        
+        if ($username) {
+            $stmt = $conn->prepare("
+                SELECT id, username, email 
+                FROM password_otps 
+                WHERE username = ? AND otp = ? AND (type = 'password_reset' OR type IS NULL OR type = '') AND used = 0 AND expires_at > NOW()
+                ORDER BY created_at DESC LIMIT 1
+            ");
+            $stmt->bind_param('ss', $username, $otp);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $otpRecord = $result->fetch_assoc();
+            $stmt->close();
+        }
+        
+        // If not found by username and email provided, try by email
+        if (!$otpRecord && $email) {
+            $stmt = $conn->prepare("
+                SELECT id, username, email 
+                FROM password_otps 
+                WHERE email = ? AND otp = ? AND (type = 'password_reset' OR type IS NULL OR type = '') AND used = 0 AND expires_at > NOW()
+                ORDER BY created_at DESC LIMIT 1
+            ");
+            $stmt->bind_param('ss', $email, $otp);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $otpRecord = $result->fetch_assoc();
+            $stmt->close();
+        }
 
         if (!$otpRecord) {
             respondError('Invalid or expired OTP. Please request a new one.');
         }
+
+        // Use the verified username from the record
+        $verifiedUsername = $otpRecord['username'];
 
         // Mark OTP as used
         $stmt = $conn->prepare("UPDATE password_otps SET used = 1 WHERE id = ?");
@@ -244,7 +267,7 @@ $loginActions = [
         respond([
             'success' => true,
             'message' => 'OTP verified successfully. You can now reset your password.',
-            'username' => $username,
+            'username' => $verifiedUsername,
         ]);
     },
     'resendOTP' => function ($conn, $body) {
@@ -284,14 +307,14 @@ $loginActions = [
         $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $otpExpiry = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 
-        // Delete any existing unused OTPs for this username
-        $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND used = 0");
+// Delete any existing unused password_reset OTPs for this username
+        $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND used = 0 AND (type = 'password_reset' OR type IS NULL OR type = '')");
         $stmt->bind_param('s', $username);
         $stmt->execute();
         $stmt->close();
 
-        // Insert new OTP
-        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at) VALUES (?, ?, ?, ?)");
+        // Insert new OTP with explicit type
+        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at, type) VALUES (?, ?, ?, ?, 'password_reset')");
         $stmt->bind_param('ssss', $username, $email, $otp, $otpExpiry);
         executePrepared($stmt, 'Failed to create OTP');
         $stmt->close();
@@ -312,6 +335,7 @@ $loginActions = [
 'resetPassword' => function ($conn, $body) {
         $otp = $body['otp'] ?? '';
         $username = $body['username'] ?? '';
+        $email = $body['email'] ?? ''; // Optional email for verification
         $newPassword = $body['newPassword'] ?? '';
         $confirmPassword = $body['confirmPassword'] ?? '';
 
@@ -327,11 +351,11 @@ $loginActions = [
 
         validatePassword($newPassword);
 
-        // Check if OTP was verified (used = 1)
+// Check if password_reset OTP was verified (used = 1)
         $stmt = $conn->prepare("
             SELECT id, email 
             FROM password_otps 
-            WHERE username = ? AND otp = ? AND used = 1
+            WHERE username = ? AND otp = ? AND (type = 'password_reset' OR type IS NULL OR type = '') AND used = 1
             ORDER BY created_at DESC LIMIT 1
         ");
         $stmt->bind_param('ss', $username, $otp);

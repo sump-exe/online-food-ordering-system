@@ -54,8 +54,8 @@ export async function requestPasswordReset(username, email) {
     return apiPost('forgotPassword', { username, email });
 }
 
-export async function verifyOTP(username, otp) {
-    return apiPost('verifyOTP', { username, otp });
+export async function verifyOTP(username, otp, email = '') {
+    return apiPost('verifyOTP', { username, otp, email });
 }
 
 export async function resendOTP(username) {
@@ -251,7 +251,8 @@ function showForgotPasswordDialog() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    let currentUsername = '';
+let currentUsername = '';
+    let currentEmail = '';
     let currentOTP = '';
 
     document.getElementById('closeForgotPasswordBtn').addEventListener('click', closeForgotPasswordModal);
@@ -267,9 +268,10 @@ function showForgotPasswordDialog() {
             return;
         }
 
-        try {
+try {
             const result = await requestPasswordReset(username, '');
             currentUsername = username;
+            currentEmail = result.email || ''; // Capture the email from response
             msgDiv.innerHTML = `
                 <div class="success-message">
                     ${result.message}<br><br>
@@ -295,8 +297,8 @@ function showForgotPasswordDialog() {
             return;
         }
 
-        try {
-            const result = await verifyOTP(currentUsername, otp);
+try {
+            const result = await verifyOTP(currentUsername, otp, currentEmail); // Pass email for verification
             currentOTP = otp;
             msgDiv.innerHTML = '<div class="success-message">OTP verified! Now set your new password.</div>';
             // Show Step 3
@@ -341,8 +343,8 @@ function showForgotPasswordDialog() {
             return;
         }
 
-        try {
-            const result = await resetPassword(currentOTP, currentUsername, newPassword, confirmPassword);
+try {
+            const result = await resetPassword(currentOTP, currentUsername, newPassword, confirmPassword, currentEmail);
             msgDiv.innerHTML = `<div class="success-message">${result.message}</div>`;
             setTimeout(() => {
                 closeForgotPasswordModal();
