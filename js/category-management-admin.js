@@ -19,10 +19,10 @@ export function renderAdminCategoriesPage() {
         <tr data-category-id="${category.categoryID}">
             <td>${category.categoryID}</td>
             <td><strong>${escapeHtml(category.name)}</strong></td>
-            <td>${escapeHtml(category.description) || '-'}</td>
-            <td>${formatDate(category.date_created)}</td>
+            <td>-</td>
+            <td>-</td>
             <td class="actions-cell">
-                <button class="editCategoryBtn btn-secondary small-btn" data-id="${category.categoryID}" data-name="${escapeHtml(category.name)}" data-description="${escapeHtml(category.description || '')}">
+                <button class="editCategoryBtn btn-secondary small-btn" data-id="${category.categoryID}" data-name="${escapeHtml(category.name)}" data-description="">
                     ✏️ Edit
                 </button>
                 <button class="deleteCategoryBtn btn-danger small-btn" data-id="${category.categoryID}" data-name="${escapeHtml(category.name)}">
@@ -261,16 +261,14 @@ function escapeHtml(str) {
 
 async function addCategory(categoryData) {
     return await apiPost('addCategory', {
-        name: categoryData.name,
-        description: categoryData.description
+        name: categoryData.name
     });
 }
 
 async function updateCategory(categoryData) {
     return await apiPost('updateCategory', {
         categoryID: categoryData.categoryID,
-        name: categoryData.name,
-        description: categoryData.description
+        name: categoryData.name
     });
 }
 

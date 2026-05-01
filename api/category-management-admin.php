@@ -3,7 +3,7 @@
 $adminCategoryActions = [
     'getCategories' => function ($conn, $body) {
         $result = $conn->query(
-            "SELECT categoryID, name, description, date_created 
+            "SELECT categoryID, name 
              FROM categories 
              ORDER BY categoryID"
         );
@@ -11,9 +11,7 @@ $adminCategoryActions = [
         while ($row = $result->fetch_assoc()) {
             $categories[] = [
                 'categoryID' => (int)$row['categoryID'],
-                'name' => $row['name'],
-                'description' => $row['description'] ?? '',
-                'date_created' => $row['date_created']
+                'name' => $row['name']
             ];
         }
         respond($categories);
@@ -21,7 +19,6 @@ $adminCategoryActions = [
     
     'addCategory' => function ($conn, $body) {
         $name = trim($body['name'] ?? '');
-        $description = trim($body['description'] ?? '');
         
         if (empty($name)) {
             respondError('Category name is required.');
@@ -38,8 +35,8 @@ $adminCategoryActions = [
         }
         $check->close();
         
-        $stmt = $conn->prepare("INSERT INTO categories (name, description) VALUES (?, ?)");
-        $stmt->bind_param('ss', $name, $description);
+        $stmt = $conn->prepare("INSERT INTO categories (name) VALUES (?)");
+        $stmt->bind_param('s', $name);
         executePrepared($stmt, 'Failed to add category');
         $newId = $stmt->insert_id;
         $stmt->close();
@@ -54,7 +51,6 @@ $adminCategoryActions = [
     'updateCategory' => function ($conn, $body) {
         $categoryId = (int)($body['categoryID'] ?? 0);
         $name = trim($body['name'] ?? '');
-        $description = trim($body['description'] ?? '');
         
         if ($categoryId <= 0) {
             respondError('Invalid category ID.');
@@ -75,8 +71,8 @@ $adminCategoryActions = [
         }
         $check->close();
         
-        $stmt = $conn->prepare("UPDATE categories SET name = ?, description = ? WHERE categoryID = ?");
-        $stmt->bind_param('ssi', $name, $description, $categoryId);
+        $stmt = $conn->prepare("UPDATE categories SET name = ? WHERE categoryID = ?");
+        $stmt->bind_param('si', $name, $categoryId);
         executePrepared($stmt, 'Failed to update category');
         $stmt->close();
         
