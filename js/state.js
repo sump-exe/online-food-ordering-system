@@ -15,6 +15,10 @@ export const state = {
     currentResetUsername: null,
     isOrderHistoryOpen: false,
     isCartOpen: false,
+    adminOrderFilter: {
+        user: '',
+        status: ''
+    },
     salesFilter: {
         year: '',
         month: '',
