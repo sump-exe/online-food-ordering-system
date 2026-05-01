@@ -28,10 +28,23 @@ export function logout(renderApp) {
     renderApp();
 }
 
-export async function registerUser(username, password) {
+export async function registerUser(username, password, email) {
     try {
-        const data = await apiPost('register', { username, password });
-        return { success: true, message: data.message };
+        const data = await apiPost('register', { username, password, email });
+        return { success: true, message: data.message, email: data.email };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+}
+
+export async function verifyRegistration(username, otp, password) {
+    try {
+        const data = await apiPost('verifyRegistration', { username, otp, password });
+        return { 
+            success: true, 
+            message: data.message,
+            user: data.user
+        };
     } catch (error) {
         return { success: false, message: error.message };
     }
@@ -108,16 +121,39 @@ function renderRegister() {
             <p style="color:#10b981;font-size:0.85rem;margin-top:8px;">Your password will be encrypted</p>
         </div>
         <div id="registerMessage"></div>
-        <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="Choose a username"></div>
-        <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Create a password"></div>
-        <div class="form-group"><label>Confirm Password</label><input type="password" id="regConfirmPassword" placeholder="Confirm your password"></div>
-        <div style="background:#fff5e6;padding:12px;border-radius:12px;margin-bottom:20px;">
-            <small style="color:#ff5722;">Password Requirements:</small><br>
-            <small style="color:#666;">- At least 8 characters long</small><br>
-            <small style="color:#666;">- At least 1 uppercase letter (A-Z)</small><br>
-            <small style="color:#666;">- At least 1 special character (!@#$%^&*())</small>
+        
+        <!-- Step 1: Initial Registration -->
+        <div id="registerStep1">
+            <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="Choose a username"></div>
+            <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="Enter your email"></div>
+            <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Create a password"></div>
+            <div class="form-group"><label>Confirm Password</label><input type="password" id="regConfirmPassword" placeholder="Confirm your password"></div>
+            <div style="background:#fff5e6;padding:12px;border-radius:12px;margin-bottom:20px;">
+                <small style="color:#ff5722;">Password Requirements:</small><br>
+                <small style="color:#666;">- At least 8 characters long</small><br>
+                <small style="color:#666;">- At least 1 uppercase letter (A-Z)</small><br>
+                <small style="color:#666;">- At least 1 special character (!@#$%^&*())</small>
+            </div>
+            <button id="doRegisterBtn" class="btn-primary" style="width:100%;padding:14px;">Send Verification OTP</button>
         </div>
-        <button id="doRegisterBtn" class="btn-primary" style="width:100%;padding:14px;">Create Account</button>
+        
+        <!-- Step 2: OTP Verification -->
+        <div id="registerStep2" style="display:none;">
+            <div class="form-group">
+                <label>Enter Verification OTP</label>
+                <input type="text" id="regOtpInput" placeholder="Enter 6-digit OTP" maxlength="6" style="text-align:center;letter-spacing:8px;font-size:18px;">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="regOtpPassword" placeholder="Enter your password">
+            </div>
+            <div class="form-group">
+                <label>Confirm Password</label>
+                <input type="password" id="regOtpConfirmPassword" placeholder="Confirm your password">
+            </div>
+            <button id="verifyRegBtn" class="btn-primary" style="width:100%;padding:14px;">Verify & Create Account</button>
+        </div>
+        
         <div style="text-align:center;margin-top:25px;">
             <span style="color:#666;">Already have an account? </span>
             <a class="hyperlink" id="goToLoginLink">Back to Login</a>
@@ -407,13 +443,14 @@ export function renderAuthScreen(root, callbacks) {
         return;
     }
 
-    document.getElementById('doRegisterBtn').addEventListener('click', async () => {
+document.getElementById('doRegisterBtn').addEventListener('click', async () => {
         const username = document.getElementById('regUsername').value;
+        const email = document.getElementById('regEmail').value;
         const password = document.getElementById('regPassword').value;
         const confirmPassword = document.getElementById('regConfirmPassword').value;
         const msgDiv = document.getElementById('registerMessage');
 
-        if (!username || !password) {
+        if (!username || !email || !password) {
             msgDiv.innerHTML = '<div class="error-message">Please fill all fields</div>';
             return;
         }
@@ -422,10 +459,18 @@ export function renderAuthScreen(root, callbacks) {
             return;
         }
 
-        const result = await registerUser(username, password);
+        const result = await registerUser(username, password, email);
         if (result.success) {
-            msgDiv.innerHTML = `<div class="success-message">${result.message}</div>`;
-            setTimeout(() => showLoginPage(renderInPlace), 2000);
+            msgDiv.innerHTML = `
+                <div class="success-message">
+                    ${result.message}<br><br>
+                    OTP sent to: <strong>${result.email}</strong>
+                </div>
+            `;
+            // Show Step 2
+            document.getElementById('registerStep1').style.display = 'none';
+            document.getElementById('registerStep2').style.display = 'block';
+            document.getElementById('regOtpInput').focus();
             return;
         }
 
@@ -435,6 +480,57 @@ export function renderAuthScreen(root, callbacks) {
                 msgDiv.innerHTML = '';
             }
         }, 3000);
+    });
+
+    // Verify Registration OTP and create account
+    document.getElementById('verifyRegBtn')?.addEventListener('click', async () => {
+        const username = document.getElementById('regUsername').value;
+        const otp = document.getElementById('regOtpInput').value;
+        const password = document.getElementById('regOtpPassword').value;
+        const confirmPassword = document.getElementById('regOtpConfirmPassword').value;
+        const msgDiv = document.getElementById('registerMessage');
+
+        if (!otp || otp.length !== 6) {
+            msgDiv.innerHTML = '<div class="error-message">Please enter a valid 6-digit OTP</div>';
+            return;
+        }
+if (!password || !confirmPassword.value) {
+            msgDiv.innerHTML = '<div class="error-message">Please fill all password fields</div>';
+            return;
+        }
+        if (password !== confirmPassword) {
+            msgDiv.innerHTML = '<div class="error-message">Passwords do not match</div>';
+            return;
+        }
+
+        const result = await verifyRegistration(username, otp, password);
+        if (result.success) {
+            msgDiv.innerHTML = `<div class="success-message">${result.message}</div>`;
+            // Auto login after verification
+            setTimeout(async () => {
+                state.currentUser = result.user;
+                await renderApp();
+            }, 2000);
+            return;
+        }
+
+        msgDiv.innerHTML = `<div class="error-message">${result.message}</div>`;
+        setTimeout(() => {
+            if (msgDiv) {
+                msgDiv.innerHTML = '';
+            }
+        }, 3000);
+    });
+
+    // Allow Enter key for OTP input
+    document.getElementById('regOtpInput')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('verifyRegBtn')?.click();
+    });
+    document.getElementById('regOtpPassword')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('verifyRegBtn')?.click();
+    });
+    document.getElementById('regOtpConfirmPassword')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('verifyRegBtn')?.click();
     });
 
     document.getElementById('goToLoginLink').addEventListener('click', () => showLoginPage(renderInPlace));

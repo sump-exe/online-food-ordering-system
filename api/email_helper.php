@@ -190,3 +190,84 @@ function sendPasswordChangedEmail($email, $username) {
         return ['success' => false, 'message' => 'Failed to send confirmation email: ' . $mail->ErrorInfo];
     }
 }
+
+/**
+ * Send email verification OTP for new registration
+ * 
+ * @param string $email Recipient email address
+ * @param string $otp 6-digit OTP code
+ * @param string $username Username of the account
+ * @return array Result with success status and message
+ */
+function sendVerificationEmail($email, $otp, $username) {
+    $mail = new PHPMailer(true);
+    
+    try {
+        // Server settings
+        $mail->SMTPDebug = SMTP::DEBUG_OFF;
+        $mail->isSMTP();
+        $mail->Host = GMAIL_SMTP_HOST;
+        $mail->SMTPAuth = true;
+        $mail->Username = GMAIL_USERNAME;
+        $mail->Password = GMAIL_APP_PASSWORD;
+        $mail->SMTPSecure = GMAIL_SMTP_ENCRYPTION;
+        $mail->Port = GMAIL_SMTP_PORT;
+        
+        // Recipients
+        $mail->setFrom(GMAIL_USERNAME, 'FoodieDash');
+        $mail->addAddress($email, $username);
+        
+        // Content
+        $mail->isHTML(true);
+        $mail->CharSet = 'UTF-8';
+        $mail->Subject = 'Verify Your Email - FoodieDash';
+        $mail->Body = '
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+                .container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                .header { text-align: center; margin-bottom: 20px; }
+                .logo { color: #ff5722; font-size: 24px; font-weight: bold; }
+                .content { font-size: 16px; color: #333; }
+                .otp-box { 
+                    background: linear-gradient(135deg, #10b981, #059669); 
+                    color: white; 
+                    padding: 20px; 
+                    text-align: center; 
+                    border-radius: 8px; 
+                    font-size: 32px; 
+                    font-weight: bold; 
+                    letter-spacing: 8px; 
+                    margin: 20px 0;
+                }
+                .footer { margin-top: 20px; font-size: 12px; color: #666; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">🍔 FoodieDash</div>
+                </div>
+                <div class="content">
+                    <p>Hello <strong>' . htmlspecialchars($username) . '</strong>,</p>
+                    <p>Thank you for registering! Use the OTP below to verify your email address:</p>
+                    <div class="otp-box">' . $otp . '</div>
+                    <p>This OTP will expire in <strong>24 hours</strong>.</p>
+                    <p>If you did not create an account, please ignore this email.</p>
+                </div>
+                <div class="footer">
+                    <p>This is an automated email. Please do not reply.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        ';
+        $mail->AltBody = "Hello $username,\n\nThank you for registering! Your verification OTP is: $otp\n\nThis OTP will expire in 24 hours.\n\nIf you did not create an account, please ignore this email.";
+        
+        $mail->send();
+        return ['success' => true, 'message' => 'Verification email sent successfully'];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Failed to send verification email: ' . $mail->ErrorInfo];
+    }
+}

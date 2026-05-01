@@ -22,12 +22,21 @@ $loginActions = [
             'role'     => $account['role'],
         ]]);
     },
-    'register' => function ($conn, $body) {
+'register' => function ($conn, $body) {
         $username = trim($body['username'] ?? '');
         $password = $body['password'] ?? '';
+        $email = trim($body['email'] ?? '');
 
         if (!$username || !$password) {
             respondError('Username and password are required.');
+        }
+
+        if (!$email) {
+            respondError('Email is required for registration.');
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            respondError('Invalid email address.');
         }
 
         validatePassword($password);
@@ -36,12 +45,92 @@ $loginActions = [
             respondError('Username already exists.');
         }
 
+        // Check if email is already used
+        $stmt = $conn->prepare("SELECT customerID FROM customers WHERE email = ?");
+        $stmt->bind_param('s', $email);
+        $stmt->execute();
+        $stmt->store_result();
+        if ($stmt->num_rows > 0) {
+            $stmt->close();
+            respondError('Email address is already registered.');
+        }
+        $stmt->close();
+
+        // Generate 6-digit OTP for email verification
+        $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $otpExpiry = date('Y-m-d H:i:s', strtotime('+24 hours')); // 24 hours for registration
+
+        // Delete any existing OTPs for this email/username
+        $stmt = $conn->prepare("DELETE FROM password_otps WHERE (username = ? OR email = ?) AND type = 'registration' AND used = 0");
+        $stmt->bind_param('ss', $username, $email);
+        $stmt->execute();
+        $stmt->close();
+
+        // Insert OTP with type = registration
+        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at, type) VALUES (?, ?, ?, ?, 'registration')");
+        $stmt->bind_param('ssss', $username, $email, $otp, $otpExpiry);
+        executePrepared($stmt, 'Failed to create verification OTP');
+        $stmt->close();
+
+        // Send verification OTP via email
+        $emailResult = sendVerificationEmail($email, $otp, $username);
+        
+        if (!$emailResult['success']) {
+            respondError('Failed to send verification email: ' . $emailResult['message']);
+        }
+
+        respond([
+            'success' => true,
+            'message' => 'Registration started! Please check your email to verify your account.',
+            'email' => maskEmail($email),
+        ]);
+    },
+    'verifyRegistration' => function ($conn, $body) {
+        $username = $body['username'] ?? '';
+        $otp = $body['otp'] ?? '';
+        $password = $body['password'] ?? '';
+
+        if (!$username || !$otp || !$password) {
+            respondError('Username, OTP, and password are required.');
+        }
+
+        if (strlen($otp) !== 6 || !ctype_digit($otp)) {
+            respondError('Invalid OTP format. Please enter a 6-digit code.');
+        }
+
+        validatePassword($password);
+
+        // Find valid registration OTP
+        $stmt = $conn->prepare("
+            SELECT id, username, email 
+            FROM password_otps 
+            WHERE username = ? AND otp = ? AND type = 'registration' AND used = 0 AND expires_at > NOW()
+            ORDER BY created_at DESC LIMIT 1
+        ");
+        $stmt->bind_param('ss', $username, $otp);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $otpRecord = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$otpRecord) {
+            respondError('Invalid or expired verification OTP. Please request a new registration.', 400);
+        }
+
+        $email = $otpRecord['email'];
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
-        $stmt = $conn->prepare("INSERT INTO customers (username, password) VALUES (?, ?)");
-        $stmt->bind_param('ss', $username, $hashedPassword);
+        // Create the customer account
+        $stmt = $conn->prepare("INSERT INTO customers (username, email, password) VALUES (?, ?, ?)");
+        $stmt->bind_param('sss', $username, $email, $hashedPassword);
         executePrepared($stmt, 'Registration failed');
         $newId = $stmt->insert_id;
+        $stmt->close();
+
+        // Mark OTP as used
+        $stmt = $conn->prepare("UPDATE password_otps SET used = 1 WHERE id = ?");
+        $stmt->bind_param('i', $otpRecord['id']);
+        $stmt->execute();
         $stmt->close();
 
         respond([
@@ -50,7 +139,7 @@ $loginActions = [
                 'username' => $username,
                 'role'     => 'customer',
             ],
-            'message' => 'Registration successful! Please login.',
+            'message' => 'Email verified! Registration complete. Please login.',
         ]);
     },
 'forgotPassword' => function ($conn, $body) {
