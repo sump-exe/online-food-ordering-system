@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/email_helper.php';
+
 $loginActions = [
     'login' => function ($conn, $body) {
         $username = $_GET['username'] ?? '';
@@ -51,13 +53,119 @@ $loginActions = [
             'message' => 'Registration successful! Please login.',
         ]);
     },
-    'forgotPassword' => function ($conn, $body) {
+'forgotPassword' => function ($conn, $body) {
         $username = $body['username'] ?? '';
 
         if (!$username) {
             respondError('Username is required.');
         }
 
+        // Check customers table first
+        $stmt = $conn->prepare("SELECT customerID, username, email FROM customers WHERE username = ?");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $userData = $result->fetch_assoc();
+        $stmt->close();
+
+        // If not found, check users table
+        if (!$userData) {
+            $stmt = $conn->prepare("SELECT userID, username, email FROM users WHERE username = ?");
+            $stmt->bind_param('s', $username);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $userData = $result->fetch_assoc();
+            $stmt->close();
+        }
+
+        if (!$userData) {
+            respondError('Username not found.');
+        }
+
+        // Check if email exists
+        $email = $userData['email'] ?? '';
+        if (empty($email)) {
+            respondError('No email address found for this user. Please contact support.');
+        }
+
+        // Generate 6-digit OTP
+        $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $otpExpiry = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+
+        // Delete any existing unused OTPs for this username
+        $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND used = 0");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $stmt->close();
+
+        // Insert new OTP
+        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param('ssss', $username, $email, $otp, $otpExpiry);
+        executePrepared($stmt, 'Failed to create OTP');
+        $stmt->close();
+
+        // Send OTP via email
+        $emailResult = sendOTPEmail($email, $otp, $username);
+        
+        if (!$emailResult['success']) {
+            respondError('Failed to send OTP email: ' . $emailResult['message']);
+        }
+
+        respond([
+            'success' => true,
+            'message' => 'OTP sent to your email address. Please check your inbox.',
+            'email' => maskEmail($email),
+        ]);
+    },
+    'verifyOTP' => function ($conn, $body) {
+        $username = $body['username'] ?? '';
+        $otp = $body['otp'] ?? '';
+
+        if (!$username || !$otp) {
+            respondError('Username and OTP are required.');
+        }
+
+        if (strlen($otp) !== 6 || !ctype_digit($otp)) {
+            respondError('Invalid OTP format. Please enter a 6-digit code.');
+        }
+
+        // Find valid OTP
+        $stmt = $conn->prepare("
+            SELECT id, username, email 
+            FROM password_otps 
+            WHERE username = ? AND otp = ? AND used = 0 AND expires_at > NOW()
+            ORDER BY created_at DESC LIMIT 1
+        ");
+        $stmt->bind_param('ss', $username, $otp);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $otpRecord = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$otpRecord) {
+            respondError('Invalid or expired OTP. Please request a new one.');
+        }
+
+        // Mark OTP as used
+        $stmt = $conn->prepare("UPDATE password_otps SET used = 1 WHERE id = ?");
+        $stmt->bind_param('i', $otpRecord['id']);
+        $stmt->execute();
+        $stmt->close();
+
+        respond([
+            'success' => true,
+            'message' => 'OTP verified successfully. You can now reset your password.',
+            'username' => $username,
+        ]);
+    },
+    'resendOTP' => function ($conn, $body) {
+        $username = $body['username'] ?? '';
+
+        if (!$username) {
+            respondError('Username is required.');
+        }
+
+        // Find user email
         $stmt = $conn->prepare("SELECT customerID, username, email FROM customers WHERE username = ?");
         $stmt->bind_param('s', $username);
         $stmt->execute();
@@ -78,36 +186,48 @@ $loginActions = [
             respondError('Username not found.');
         }
 
-        $resetToken = bin2hex(random_bytes(32));
-        $tokenExpiry = date('Y-m-d H:i:s', strtotime('+1 hour'));
+        $email = $userData['email'] ?? '';
+        if (empty($email)) {
+            respondError('No email address found for this user. Please contact support.');
+        }
 
-        $stmt = $conn->prepare("
-            INSERT INTO password_resets (username, token, expiry, created_at)
-            VALUES (?, ?, ?, NOW())
-            ON DUPLICATE KEY UPDATE
-            token = VALUES(token),
-            expiry = VALUES(expiry),
-            created_at = NOW()
-        ");
-        $stmt->bind_param('sss', $username, $resetToken, $tokenExpiry);
-        executePrepared($stmt, 'Failed to create password reset');
+        // Generate new 6-digit OTP
+        $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $otpExpiry = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+
+        // Delete any existing unused OTPs for this username
+        $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND used = 0");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
         $stmt->close();
+
+        // Insert new OTP
+        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param('ssss', $username, $email, $otp, $otpExpiry);
+        executePrepared($stmt, 'Failed to create OTP');
+        $stmt->close();
+
+        // Send OTP via email
+        $emailResult = sendOTPEmail($email, $otp, $username);
+        
+        if (!$emailResult['success']) {
+            respondError('Failed to send OTP email: ' . $emailResult['message']);
+        }
 
         respond([
             'success' => true,
-            'message' => 'Password reset link generated. Use this token to reset your password.',
-            'reset_token' => $resetToken,
-            'reset_link' => "reset-password.html?token=$resetToken&username=" . urlencode($username),
+            'message' => 'New OTP sent to your email address.',
+            'email' => maskEmail($email),
         ]);
     },
-    'resetPassword' => function ($conn, $body) {
-        $token = $body['token'] ?? '';
+'resetPassword' => function ($conn, $body) {
+        $otp = $body['otp'] ?? '';
         $username = $body['username'] ?? '';
         $newPassword = $body['newPassword'] ?? '';
         $confirmPassword = $body['confirmPassword'] ?? '';
 
-        if (!$token || !$username) {
-            respondError('Token and username are required.');
+        if (!$otp || !$username) {
+            respondError('OTP and username are required.');
         }
         if (!$newPassword || !$confirmPassword) {
             respondError('New password and confirmation are required.');
@@ -118,24 +238,27 @@ $loginActions = [
 
         validatePassword($newPassword);
 
+        // Check if OTP was verified (used = 1)
         $stmt = $conn->prepare("
-            SELECT * FROM password_resets
-            WHERE username = ? AND token = ? AND expiry > NOW()
+            SELECT id, email 
+            FROM password_otps 
+            WHERE username = ? AND otp = ? AND used = 1
             ORDER BY created_at DESC LIMIT 1
         ");
-        $stmt->bind_param('ss', $username, $token);
+        $stmt->bind_param('ss', $username, $otp);
         $stmt->execute();
         $result = $stmt->get_result();
-        $resetRecord = $result->fetch_assoc();
+        $otpRecord = $result->fetch_assoc();
         $stmt->close();
 
-        if (!$resetRecord) {
-            respondError('Invalid or expired reset token. Please request a new password reset.');
+        if (!$otpRecord) {
+            respondError('Invalid OTP. Please verify your OTP first before resetting password.');
         }
 
         $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
         $updated = false;
 
+        // Try customers table first
         $stmt = $conn->prepare("UPDATE customers SET password = ? WHERE username = ?");
         $stmt->bind_param('ss', $hashedPassword, $username);
         $stmt->execute();
@@ -144,6 +267,7 @@ $loginActions = [
         }
         $stmt->close();
 
+        // If not updated, try users table
         if (!$updated) {
             $stmt = $conn->prepare("UPDATE users SET password = ? WHERE username = ?");
             $stmt->bind_param('ss', $hashedPassword, $username);
@@ -158,35 +282,21 @@ $loginActions = [
             respondError('User not found.');
         }
 
-        $stmt = $conn->prepare("DELETE FROM password_resets WHERE username = ? AND token = ?");
-        $stmt->bind_param('ss', $username, $token);
-        executePrepared($stmt, 'Failed to delete password reset token');
+        // Delete used OTP
+        $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND otp = ?");
+        $stmt->bind_param('ss', $username, $otp);
+        $stmt->execute();
         $stmt->close();
+
+        // Send confirmation email if we have the email
+        if (!empty($otpRecord['email'])) {
+            sendPasswordChangedEmail($otpRecord['email'], $username);
+        }
 
         respond([
             'success' => true,
             'message' => 'Password has been reset successfully! Please login with your new password.',
         ]);
-    },
-    'verifyResetToken' => function ($conn, $body) {
-        $token = $_GET['token'] ?? '';
-        $username = $_GET['username'] ?? '';
-
-        if (!$token || !$username) {
-            respond(['valid' => false, 'message' => 'Missing token or username']);
-        }
-
-        $stmt = $conn->prepare("
-            SELECT * FROM password_resets
-            WHERE username = ? AND token = ? AND expiry > NOW()
-        ");
-        $stmt->bind_param('ss', $username, $token);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $valid = $result->num_rows > 0;
-        $stmt->close();
-
-        respond(['valid' => $valid]);
     },
     'getAccountSettings' => function ($conn, $body) {
         $customerId = (int)($_GET['customerId'] ?? 0);
@@ -217,7 +327,7 @@ $loginActions = [
             'phone_number' => $account['phone_number'] ?? '',
         ]);
     },
-    'updateAccountSettings' => function ($conn, $body) {
+'updateAccountSettings' => function ($conn, $body) {
         $customerId = (int)($body['customerId'] ?? 0);
         $email = trim((string)($body['email'] ?? ''));
         $phoneNumber = trim((string)($body['phoneNumber'] ?? ''));
@@ -233,7 +343,7 @@ $loginActions = [
             respondError('Invalid email address.');
         }
 
-        $stmt = $conn->prepare("SELECT username, password FROM customers WHERE customerID = ?");
+        $stmt = $conn->prepare("SELECT username, email, password FROM customers WHERE customerID = ?");
         $stmt->bind_param('i', $customerId);
         executePrepared($stmt, 'Failed to verify account');
         $result = $stmt->get_result();
@@ -244,7 +354,11 @@ $loginActions = [
             respondError('Customer account not found.', 404);
         }
 
+        $currentEmail = $account['email'] ?? '';
+        $username = $account['username'];
         $hashedPassword = null;
+        $passwordChanged = false;
+
         if ($newPassword !== '' || $confirmPassword !== '' || $currentPassword !== '') {
             if ($currentPassword === '') {
                 respondError('Current password is required to change password.');
@@ -261,6 +375,7 @@ $loginActions = [
 
             validatePassword($newPassword);
             $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+            $passwordChanged = true;
         }
 
         if ($hashedPassword !== null) {
@@ -281,6 +396,14 @@ $loginActions = [
 
         executePrepared($stmt, 'Failed to update account settings');
         $stmt->close();
+
+        // Send confirmation email if password was changed
+        if ($passwordChanged) {
+            $notificationEmail = !empty($email) ? $email : $currentEmail;
+            if (!empty($notificationEmail)) {
+                sendPasswordChangedEmail($notificationEmail, $username);
+            }
+        }
 
         respond([
             'success' => true,

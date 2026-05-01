@@ -41,8 +41,16 @@ export async function requestPasswordReset(username, email) {
     return apiPost('forgotPassword', { username, email });
 }
 
-export async function resetPassword(token, username, newPassword, confirmPassword) {
-    return apiPost('resetPassword', { token, username, newPassword, confirmPassword });
+export async function verifyOTP(username, otp) {
+    return apiPost('verifyOTP', { username, otp });
+}
+
+export async function resendOTP(username) {
+    return apiPost('resendOTP', { username });
+}
+
+export async function resetPassword(otp, username, newPassword, confirmPassword) {
+    return apiPost('resetPassword', { otp, username, newPassword, confirmPassword });
 }
 
 export async function verifyResetToken(token, username) {
@@ -166,18 +174,38 @@ function showForgotPasswordDialog() {
                 <button id="closeForgotPasswordBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
                 <div style="text-align:center;margin-bottom:20px;">
                     <h2 style="color:#ff5722;margin-top:10px;">Forgot Password?</h2>
-                    <p style="color:#666;font-size:0.9rem;">Enter your username to reset your password</p>
+                    <p style="color:#666;font-size:0.9rem;">Enter your username to receive an OTP via email</p>
                 </div>
                 <div id="forgotPasswordMessage"></div>
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" id="resetUsername" placeholder="Enter your username">
+                <div id="forgotPasswordStep1">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="resetUsername" placeholder="Enter your username">
+                    </div>
+                    <button id="requestResetBtn" class="btn-primary" style="width:100%;padding:12px;">Send OTP</button>
                 </div>
-                <div class="form-group">
-                    <label>Email (Optional)</label>
-                    <input type="email" id="resetEmail" placeholder="Enter your email (optional)">
+                <div id="forgotPasswordStep2" style="display:none;">
+                    <div class="form-group">
+                        <label>Enter OTP</label>
+                        <input type="text" id="otpInput" placeholder="Enter 6-digit OTP" maxlength="6" style="text-align:center;letter-spacing:8px;font-size:18px;">
+                    </div>
+                    <button id="verifyOtpBtn" class="btn-primary" style="width:100%;padding:12px;">Verify OTP</button>
+                    <div style="text-align:center;margin-top:15px;">
+                        <small style="color:#666;">Didn't receive it? </small>
+                        <a class="hyperlink" id="resendOtpLink">Resend OTP</a>
+                    </div>
                 </div>
-                <button id="requestResetBtn" class="btn-primary" style="width:100%;padding:12px;">Send Reset Link</button>
+                <div id="forgotPasswordStep3" style="display:none;">
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" id="newResetPassword" placeholder="Enter new password">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm New Password</label>
+                        <input type="password" id="confirmResetPassword" placeholder="Confirm new password">
+                    </div>
+                    <button id="confirmResetBtn" class="btn-primary" style="width:100%;padding:12px;">Reset Password</button>
+                </div>
                 <div style="text-align:center;margin-top:20px;">
                     <a class="hyperlink" id="backFromForgotLink">Back to Login</a>
                 </div>
@@ -187,11 +215,15 @@ function showForgotPasswordDialog() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
+    let currentUsername = '';
+    let currentOTP = '';
+
     document.getElementById('closeForgotPasswordBtn').addEventListener('click', closeForgotPasswordModal);
     document.getElementById('backFromForgotLink').addEventListener('click', closeForgotPasswordModal);
+    
+    // Step 1: Request OTP
     document.getElementById('requestResetBtn').addEventListener('click', async () => {
         const username = document.getElementById('resetUsername').value;
-        const email = document.getElementById('resetEmail').value;
         const msgDiv = document.getElementById('forgotPasswordMessage');
 
         if (!username) {
@@ -200,20 +232,100 @@ function showForgotPasswordDialog() {
         }
 
         try {
-            const result = await requestPasswordReset(username, email);
+            const result = await requestPasswordReset(username, '');
+            currentUsername = username;
             msgDiv.innerHTML = `
                 <div class="success-message">
                     ${result.message}<br><br>
-                    <strong>Your reset token:</strong><br>
-                    <code style="background:#f0f0f0;padding:5px;display:inline-block;margin:5px 0;">${result.reset_token}</code><br><br>
-                    <a href="${result.reset_link}" target="_blank" style="color:#ff5722;">Click here to reset your password</a><br><br>
-                    <small>Note: In production, this would be sent to your email.</small>
+                    OTP sent to: <strong>${result.email}</strong>
                 </div>
             `;
-            setTimeout(closeForgotPasswordModal, 8000);
+            // Show Step 2
+            document.getElementById('forgotPasswordStep1').style.display = 'none';
+            document.getElementById('forgotPasswordStep2').style.display = 'block';
+            document.getElementById('otpInput').focus();
         } catch (error) {
             msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
         }
+    });
+
+    // Step 2: Verify OTP
+    document.getElementById('verifyOtpBtn').addEventListener('click', async () => {
+        const otp = document.getElementById('otpInput').value;
+        const msgDiv = document.getElementById('forgotPasswordMessage');
+
+        if (!otp || otp.length !== 6) {
+            msgDiv.innerHTML = '<div class="error-message">Please enter a valid 6-digit OTP</div>';
+            return;
+        }
+
+        try {
+            const result = await verifyOTP(currentUsername, otp);
+            currentOTP = otp;
+            msgDiv.innerHTML = '<div class="success-message">OTP verified! Now set your new password.</div>';
+            // Show Step 3
+            document.getElementById('forgotPasswordStep2').style.display = 'none';
+            document.getElementById('forgotPasswordStep3').style.display = 'block';
+            document.getElementById('newResetPassword').focus();
+        } catch (error) {
+            msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        }
+    });
+
+    // Resend OTP
+    document.getElementById('resendOtpLink').addEventListener('click', async () => {
+        const msgDiv = document.getElementById('forgotPasswordMessage');
+        
+        try {
+            const result = await resendOTP(currentUsername);
+            msgDiv.innerHTML = `
+                <div class="success-message">
+                    ${result.message}<br><br>
+                    OTP sent to: <strong>${result.email}</strong>
+                </div>
+            `;
+        } catch (error) {
+            msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        }
+    });
+
+    // Step 3: Reset Password
+    document.getElementById('confirmResetBtn').addEventListener('click', async () => {
+        const newPassword = document.getElementById('newResetPassword').value;
+        const confirmPassword = document.getElementById('confirmResetPassword').value;
+        const msgDiv = document.getElementById('forgotPasswordMessage');
+
+        if (!newPassword || !confirmPassword) {
+            msgDiv.innerHTML = '<div class="error-message">Please fill all password fields</div>';
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            msgDiv.innerHTML = '<div class="error-message">Passwords do not match</div>';
+            return;
+        }
+
+        try {
+            const result = await resetPassword(currentOTP, currentUsername, newPassword, confirmPassword);
+            msgDiv.innerHTML = `<div class="success-message">${result.message}</div>`;
+            setTimeout(() => {
+                closeForgotPasswordModal();
+                showLoginPage(window.renderApp);
+            }, 3000);
+        } catch (error) {
+            msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        }
+    });
+
+    // Allow Enter key navigation through steps
+    document.getElementById('resetUsername')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('requestResetBtn').click();
+    });
+    document.getElementById('otpInput')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('verifyOtpBtn').click();
+    });
+    document.getElementById('confirmResetPassword')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('confirmResetBtn').click();
     });
 }
 
