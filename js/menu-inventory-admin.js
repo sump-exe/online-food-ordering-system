@@ -141,7 +141,8 @@ export function renderAdminTrashPage() {
                 <button class="restoreItemBtn btn-secondary small-btn" data-id="${item.itemID}">
                     Restore
                 </button>
-                <button class="permanentDeleteItemBtn btn-danger small-btn" data-id="${item.itemID}">
+                <br>
+                <button class="permanentDeleteItemBtn btn-danger small-btn" data-id="${item.itemID}" style="margin-top:5px;">
                     Permanent Delete
                 </button>
             </td>
@@ -158,11 +159,13 @@ export function renderAdminTrashPage() {
                 <button class="restoreCategoryBtn btn-secondary small-btn" data-id="${category.categoryID}">
                     Restore
                 </button>
+                <br>
                 <button
                     class="permanentDeleteCategoryBtn btn-danger small-btn"
                     data-id="${category.categoryID}"
                     data-name="${escapeHtml(category.name)}"
-                    data-item-count="${category.item_count || 0}">
+                    data-item-count="${category.item_count || 0}"
+                    style="margin-top:5px;">
                     Permanent Delete
                 </button>
             </td>
@@ -175,56 +178,58 @@ export function renderAdminTrashPage() {
             <h1>Trash</h1>
             <p>Restore deleted menu items and categories or remove them permanently</p>
         </div>
-        <div class="panel">
-            <h2>Deleted Menu Items</h2>
-            <div style="overflow-x:auto;">
-                <table class="menu-inventory-table">
-                    <colgroup>
-                        <col style="width: 28%;">
-                        <col style="width: 18%;">
-                        <col style="width: 10%;">
-                        <col style="width: 12%;">
-                        <col style="width: 32%;">
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th>Item</th>
-                            <th>Category</th>
-                            <th>QTY</th>
-                            <th>Price</th>
-                            <th class="menu-actions-header">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${deletedItemRowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No deleted menu items.</td></tr>'}
-                    </tbody>
-                </table>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:24px;align-items:start;">
+            <div class="panel" style="margin-bottom:0;min-width:0;">
+                <h2>Deleted Menu Items</h2>
+                <div style="overflow-x:auto;">
+                    <table class="menu-inventory-table" style="width:100%;">
+                        <colgroup>
+                            <col style="width: 28%;">
+                            <col style="width: 18%;">
+                            <col style="width: 10%;">
+                            <col style="width: 12%;">
+                            <col style="width: 32%;">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Category</th>
+                                <th>QTY</th>
+                                <th>Price</th>
+                                <th class="menu-actions-header">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${deletedItemRowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No deleted menu items.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
-        <div class="panel">
-            <h2>Deleted Categories</h2>
-            <div style="overflow-x:auto;">
-                <table class="menu-inventory-table">
-                    <colgroup>
-                        <col style="width: 24%;">
-                        <col style="width: 28%;">
-                        <col style="width: 14%;">
-                        <col style="width: 10%;">
-                        <col style="width: 24%;">
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th>Category</th>
-                            <th>Description</th>
-                            <th>Type</th>
-                            <th>Items</th>
-                            <th class="menu-actions-header">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${deletedCategoryRowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No deleted categories.</td></tr>'}
-                    </tbody>
-                </table>
+            <div class="panel" style="margin-bottom:0;min-width:0;">
+                <h2>Deleted Categories</h2>
+                <div style="overflow-x:auto;">
+                    <table class="menu-inventory-table" style="width:100%;">
+                        <colgroup>
+                            <col style="width: 24%;">
+                            <col style="width: 28%;">
+                            <col style="width: 14%;">
+                            <col style="width: 10%;">
+                            <col style="width: 24%;">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Type</th>
+                                <th>Items</th>
+                                <th class="menu-actions-header">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${deletedCategoryRowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No deleted categories.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>`;
