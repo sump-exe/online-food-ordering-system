@@ -5,5 +5,3 @@ NOTE FOR GROUPMATES!!!
 > import repository in C:/xampp/htdocs to allow use for an SQL database.
 ----------
 > db folder should be contained in C:/xampp/mysql/data
-
-> did this to commit again
