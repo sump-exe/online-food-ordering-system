@@ -496,7 +496,7 @@ document.getElementById('doRegisterBtn').addEventListener('click', async () => {
             msgDiv.innerHTML = '<div class="error-message">Please enter a valid 6-digit OTP</div>';
             return;
         }
-if (!password || !confirmPassword.value) {
+        if (!password || !confirmPassword) {
             msgDiv.innerHTML = '<div class="error-message">Please fill all password fields</div>';
             return;
         }

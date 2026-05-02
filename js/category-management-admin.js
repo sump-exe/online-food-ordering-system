@@ -1,6 +1,13 @@
 import { apiGet, apiPost } from './api.js';
 import { state } from './state.js';
 
+const CATEGORY_TYPES = {
+    food: { label: 'Food', icon: '&#127828;', color: '#ff5722' },
+    drinks: { label: 'Drinks', icon: '&#129380;', color: '#2196f3' },
+    desserts: { label: 'Desserts', icon: '&#127856;', color: '#9c27b0' },
+    addons: { label: 'Add-ons', icon: '&#10133;', color: '#4caf50' }
+};
+
 export async function loadCategories() {
     try {
         const categories = await apiGet('getAdminCategories');
@@ -12,56 +19,114 @@ export async function loadCategories() {
     }
 }
 
+export async function loadDeletedCategories() {
+    try {
+        const categories = await apiGet('getDeletedCategories');
+        state.deletedAdminCategories = categories;
+        return categories;
+    } catch (error) {
+        console.error('Failed to load deleted categories:', error);
+        return [];
+    }
+}
+
+export async function loadMenuItemsByCategory(categoryId) {
+    try {
+        return await apiGet('getMenuItemsByCategory', { categoryId });
+    } catch (error) {
+        console.error('Failed to load menu items:', error);
+        return [];
+    }
+}
+
 export function renderAdminCategoriesPage() {
     const categories = state.adminCategories || [];
-    
-    const rowsHtml = categories.map(category => `
-        <tr data-category-id="${category.categoryID}">
-            <td>${category.categoryID}</td>
-            <td><strong>${escapeHtml(category.name)}</strong></td>
-            <td>-</td>
-            <td>-</td>
-            <td class="actions-cell">
-                <button class="editCategoryBtn btn-secondary small-btn" data-id="${category.categoryID}" data-name="${escapeHtml(category.name)}" data-description="">
-                    ✏️ Edit
-                </button>
-                <button class="deleteCategoryBtn btn-danger small-btn" data-id="${category.categoryID}" data-name="${escapeHtml(category.name)}">
-                    🗑️ Delete
-                </button>
-            </td>
-        </tr>
-    `).join('');
+
+    const groupedCategories = {
+        food: categories.filter((c) => c.category_type === 'food'),
+        drinks: categories.filter((c) => c.category_type === 'drinks'),
+        desserts: categories.filter((c) => c.category_type === 'desserts'),
+        addons: categories.filter((c) => c.category_type === 'addons')
+    };
+
+    let groupsHtml = '';
+
+    for (const [type, items] of Object.entries(groupedCategories)) {
+        const typeConfig = CATEGORY_TYPES[type];
+        if (!typeConfig) continue;
+
+        const rowsHtml = items.map((category) => `
+            <tr data-category-id="${category.categoryID}">
+                <td style="width: 80px;">${category.categoryID}</td>
+                <td><strong>${escapeHtml(category.name)}</strong></td>
+                <td>${escapeHtml(category.description) || '-'}</td>
+                <td style="width: 100px;">
+                    <span class="item-count-badge">${category.item_count || 0} items</span>
+                </td>
+                <td style="width: 160px;">${formatDate(category.date_created)}</td>
+                <td class="actions-cell" style="width: 140px;">
+                    <button class="editCategoryBtn btn-secondary small-btn"
+                            data-id="${category.categoryID}"
+                            data-name="${escapeHtml(category.name)}"
+                            data-description="${escapeHtml(category.description || '')}"
+                            data-type="${type}">
+                        Edit
+                    </button>
+                    <button class="deleteCategoryBtn btn-danger small-btn"
+                            data-id="${category.categoryID}"
+                            data-name="${escapeHtml(category.name)}">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        groupsHtml += `
+            <div class="category-group">
+                <div class="category-group-header" style="border-left-color: ${typeConfig.color}">
+                    <span class="category-group-icon">${typeConfig.icon}</span>
+                    <h3>${typeConfig.label}</h3>
+                    <span class="category-count">${items.length} categories</span>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="categories-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Category Name</th>
+                                <th>Description</th>
+                                <th>Items</th>
+                                <th>Date Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml || '<tr><td colspan="6" style="text-align: center; padding: 30px; color: #aaa;">No categories found. Click "Add Category" to create one.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
 
     return `
     <div class="admin-page-content">
         <div class="page-header">
             <h1>Category Management</h1>
-            <p>Manage your menu categories - organize your food items</p>
-        </div>
-        
-        <div class="panel">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-                <h2 style="margin-bottom: 0;">Categories</h2>
-                <button id="addCategoryBtn" class="btn-primary">
-                    ➕ Add Category
-                </button>
+            <p>Manage your menu categories - organize by type (Food, Drinks, Desserts, Add-ons)</p>
+            <div class="info-banner">
+                Soft delete moves a category to Trash. Permanent delete removes it from the database and active menu items under it become uncategorized.
             </div>
-            
-            <div style="overflow-x: auto;">
-                <table class="categories-table" style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Category Name</th>
-                            <th>Description</th>
-                            <th>Date Created</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rowsHtml || '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #aaa;">No categories found. Click "Add Category" to create one.</td></tr>'}
-                    </tbody>
-                </table>
+        </div>
+
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+                <h2 style="margin-bottom: 0;">Categories by Type</h2>
+                <button id="addCategoryBtn" class="btn-primary">Add Category</button>
+            </div>
+
+            <div class="category-groups-container">
+                ${groupsHtml}
             </div>
         </div>
     </div>`;
@@ -69,7 +134,11 @@ export function renderAdminCategoriesPage() {
 
 function showAddCategoryModal(onSave, onClose) {
     removeModal();
-    
+
+    const typeOptions = Object.entries(CATEGORY_TYPES).map(([value, config]) =>
+        `<option value="${value}">${config.icon} ${config.label}</option>`
+    ).join('');
+
     const modalHtml = `
     <div id="categoryModal" class="modal-overlay">
         <div class="modal-container">
@@ -79,6 +148,10 @@ function showAddCategoryModal(onSave, onClose) {
             </div>
             <div class="modal-body">
                 <div id="modalMessage" class="modal-message" style="display: none;"></div>
+                <div class="form-group">
+                    <label>Category Type <span style="color: #dc2626;">*</span></label>
+                    <select id="categoryType">${typeOptions}</select>
+                </div>
                 <div class="form-group">
                     <label>Category Name <span style="color: #dc2626;">*</span></label>
                     <input type="text" id="categoryName" placeholder="e.g., Appetizers, Main Course, Desserts" autocomplete="off">
@@ -94,64 +167,64 @@ function showAddCategoryModal(onSave, onClose) {
             </div>
         </div>
     </div>`;
-    
+
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
+
     const modal = document.getElementById('categoryModal');
+    const typeSelect = document.getElementById('categoryType');
     const nameInput = document.getElementById('categoryName');
     const descInput = document.getElementById('categoryDescription');
     const saveBtn = document.getElementById('saveCategoryBtn');
     const cancelBtn = document.getElementById('cancelModalBtn');
     const closeBtn = document.getElementById('closeModalBtn');
     const messageDiv = document.getElementById('modalMessage');
-    
+
     const closeModal = () => {
         modal.remove();
         if (onClose) onClose();
     };
-    
+
     const showMessage = (message, isError = true) => {
         messageDiv.textContent = message;
         messageDiv.className = `modal-message ${isError ? 'error' : 'success'}`;
         messageDiv.style.display = 'block';
-        setTimeout(() => {
-            messageDiv.style.display = 'none';
-        }, 3000);
     };
-    
+
     saveBtn.addEventListener('click', async () => {
+        const categoryType = typeSelect.value;
         const name = nameInput.value.trim();
+
         if (!name) {
             showMessage('Category name is required.');
             nameInput.focus();
             return;
         }
-        
+
         try {
-            await onSave({ name, description: descInput.value.trim() });
-            closeModal();
+            const result = await onSave({
+                name,
+                description: descInput.value.trim(),
+                category_type: categoryType
+            });
+            showMessage(result.message || 'Category added successfully!', false);
+            setTimeout(() => closeModal(), 1200);
         } catch (error) {
             showMessage(error.message);
         }
     });
-    
+
     cancelBtn.addEventListener('click', closeModal);
     closeBtn.addEventListener('click', closeModal);
-    
-    const handleEscape = (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', handleEscape);
-        }
-    };
-    document.addEventListener('keydown', handleEscape);
-    
     nameInput.focus();
 }
 
 function showEditCategoryModal(category, onUpdate, onClose) {
     removeModal();
-    
+
+    const typeOptions = Object.entries(CATEGORY_TYPES).map(([value, config]) =>
+        `<option value="${value}" ${category.category_type === value ? 'selected' : ''}>${config.icon} ${config.label}</option>`
+    ).join('');
+
     const modalHtml = `
     <div id="categoryModal" class="modal-overlay">
         <div class="modal-container">
@@ -162,12 +235,16 @@ function showEditCategoryModal(category, onUpdate, onClose) {
             <div class="modal-body">
                 <div id="modalMessage" class="modal-message" style="display: none;"></div>
                 <div class="form-group">
+                    <label>Category Type <span style="color: #dc2626;">*</span></label>
+                    <select id="categoryType">${typeOptions}</select>
+                </div>
+                <div class="form-group">
                     <label>Category Name <span style="color: #dc2626;">*</span></label>
-                    <input type="text" id="categoryName" value="${escapeHtml(category.name)}" placeholder="e.g., Appetizers, Main Course, Desserts" autocomplete="off">
+                    <input type="text" id="categoryName" value="${escapeHtml(category.name)}" autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label>Description <span style="color: #aaa;">(Optional)</span></label>
-                    <textarea id="categoryDescription" rows="3" placeholder="Describe this category...">${escapeHtml(category.description || '')}</textarea>
+                    <textarea id="categoryDescription" rows="3">${escapeHtml(category.description || '')}</textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -176,58 +253,51 @@ function showEditCategoryModal(category, onUpdate, onClose) {
             </div>
         </div>
     </div>`;
-    
+
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
+
     const modal = document.getElementById('categoryModal');
+    const typeSelect = document.getElementById('categoryType');
     const nameInput = document.getElementById('categoryName');
     const descInput = document.getElementById('categoryDescription');
     const updateBtn = document.getElementById('updateCategoryBtn');
     const cancelBtn = document.getElementById('cancelModalBtn');
     const closeBtn = document.getElementById('closeModalBtn');
     const messageDiv = document.getElementById('modalMessage');
-    
+
     const closeModal = () => {
         modal.remove();
         if (onClose) onClose();
     };
-    
-    const showMessage = (message, isError = true) => {
+
+    const showMessage = (message) => {
         messageDiv.textContent = message;
-        messageDiv.className = `modal-message ${isError ? 'error' : 'success'}`;
+        messageDiv.className = 'modal-message error';
         messageDiv.style.display = 'block';
-        setTimeout(() => {
-            messageDiv.style.display = 'none';
-        }, 3000);
     };
-    
+
     updateBtn.addEventListener('click', async () => {
         const name = nameInput.value.trim();
         if (!name) {
             showMessage('Category name is required.');
-            nameInput.focus();
             return;
         }
-        
+
         try {
-            await onUpdate({ ...category, name, description: descInput.value.trim() });
+            await onUpdate({
+                ...category,
+                name,
+                description: descInput.value.trim(),
+                category_type: typeSelect.value
+            });
             closeModal();
         } catch (error) {
             showMessage(error.message);
         }
     });
-    
+
     cancelBtn.addEventListener('click', closeModal);
     closeBtn.addEventListener('click', closeModal);
-    
-    const handleEscape = (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', handleEscape);
-        }
-    };
-    document.addEventListener('keydown', handleEscape);
-    
     nameInput.focus();
     nameInput.select();
 }
@@ -240,12 +310,10 @@ function removeModal() {
 function formatDate(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
     });
 }
 
@@ -260,45 +328,55 @@ function escapeHtml(str) {
 }
 
 async function addCategory(categoryData) {
-    return await apiPost('addCategory', {
-        name: categoryData.name
-    });
+    return apiPost('addCategory', categoryData);
 }
 
 async function updateCategory(categoryData) {
-    return await apiPost('updateCategory', {
+    return apiPost('updateCategory', {
         categoryID: categoryData.categoryID,
-        name: categoryData.name
+        name: categoryData.name,
+        description: categoryData.description,
+        category_type: categoryData.category_type
     });
 }
 
 async function deleteCategory(categoryId) {
-    return await apiPost('deleteCategory', { categoryID: categoryId });
+    return apiPost('deleteCategory', { categoryID: categoryId });
+}
+
+async function restoreCategory(categoryId) {
+    return apiPost('restoreCategory', { categoryID: categoryId });
+}
+
+async function permanentlyDeleteCategory(categoryId) {
+    return apiPost('permanentlyDeleteCategory', { categoryID: categoryId });
 }
 
 export function attachCategoryEvents(callbacks) {
     const { renderApp, refreshCategories, setAdminMessage } = callbacks;
-    
+
     const addBtn = document.getElementById('addCategoryBtn');
     if (addBtn) {
-        addBtn.addEventListener('click', () => {
+        addBtn.onclick = () => {
             showAddCategoryModal(
                 async (categoryData) => {
-                    await addCategory(categoryData);
+                    const result = await addCategory(categoryData);
                     if (refreshCategories) await refreshCategories();
                     if (renderApp) await renderApp();
-                },
-                () => {}
+                    if (setAdminMessage) setAdminMessage(result.message, 'success');
+                    return result;
+                }
             );
-        });
+        };
     }
-    
-    document.querySelectorAll('.editCategoryBtn').forEach(btn => {
-        btn.addEventListener('click', () => {
+
+    document.querySelectorAll('.editCategoryBtn').forEach((btn) => {
+        btn.onclick = () => {
             const category = {
                 categoryID: parseInt(btn.dataset.id, 10),
                 name: btn.dataset.name,
-                description: btn.dataset.description
+                description: btn.dataset.description,
+                category_type: btn.dataset.type
             };
             showEditCategoryModal(
                 category,
@@ -306,29 +384,73 @@ export function attachCategoryEvents(callbacks) {
                     await updateCategory(updatedCategory);
                     if (refreshCategories) await refreshCategories();
                     if (renderApp) await renderApp();
-                },
-                () => {}
+                }
             );
-        });
+        };
     });
-    
-    document.querySelectorAll('.deleteCategoryBtn').forEach(btn => {
-        btn.addEventListener('click', async () => {
+
+    document.querySelectorAll('.deleteCategoryBtn').forEach((btn) => {
+        btn.onclick = async () => {
             const categoryId = parseInt(btn.dataset.id, 10);
             const categoryName = btn.dataset.name;
-            
-            const confirmed = confirm(`Are you sure you want to delete category "${categoryName}"?\n\nThis action cannot be undone.`);
-            
-            if (confirmed) {
-                try {
-                    await deleteCategory(categoryId);
-                    if (refreshCategories) await refreshCategories();
-                    if (renderApp) await renderApp();
-                    if (setAdminMessage) setAdminMessage(`Category "${categoryName}" deleted successfully`, 'success');
-                } catch (error) {
-                    alert(error.message);
-                }
+            if (!confirm(`Move category "${categoryName}" to Trash?`)) {
+                return;
             }
-        });
+
+            try {
+                const result = await deleteCategory(categoryId);
+                if (refreshCategories) await refreshCategories();
+                if (renderApp) await renderApp();
+                if (setAdminMessage) {
+                    setAdminMessage(result.message, 'success');
+                }
+            } catch (error) {
+                alert(error.message);
+            }
+        };
+    });
+
+    document.querySelectorAll('.restoreCategoryBtn').forEach((btn) => {
+        btn.onclick = async () => {
+            try {
+                const result = await restoreCategory(parseInt(btn.dataset.id, 10));
+                if (refreshCategories) await refreshCategories();
+                if (renderApp) await renderApp();
+                if (setAdminMessage) {
+                    setAdminMessage(result.message, 'success');
+                }
+            } catch (error) {
+                alert(error.message);
+            }
+        };
+    });
+
+    document.querySelectorAll('.permanentDeleteCategoryBtn').forEach((btn) => {
+        btn.onclick = async () => {
+            const categoryId = parseInt(btn.dataset.id, 10);
+            const categoryName = btn.dataset.name;
+            const itemCount = parseInt(btn.dataset.itemCount, 10);
+
+            let message = `Permanently delete category "${categoryName}"?`;
+            if (itemCount > 0) {
+                message += `\n\n${itemCount} active menu item(s) will become Uncategorized.`;
+            }
+            message += '\n\nThis cannot be undone.';
+
+            if (!confirm(message)) {
+                return;
+            }
+
+            try {
+                const result = await permanentlyDeleteCategory(categoryId);
+                if (refreshCategories) await refreshCategories();
+                if (renderApp) await renderApp();
+                if (setAdminMessage) {
+                    setAdminMessage(result.message, 'success');
+                }
+            } catch (error) {
+                alert(error.message);
+            }
+        };
     });
 }

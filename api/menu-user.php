@@ -11,7 +11,10 @@ $userMenuActions = [
                     c.name AS category_name,
                     (m.stock > 0) AS available
              FROM menu_items m
-             LEFT JOIN categories c ON c.categoryID = m.categoryID
+             LEFT JOIN categories c
+                    ON c.categoryID = m.categoryID
+                   AND COALESCE(c.is_deleted, 0) = 0
+             WHERE COALESCE(m.is_deleted, 0) = 0
              ORDER BY m.itemID"
         );
         $items = fetchAllRows($result, ['itemID', 'price', 'stock', 'categoryID'], ['available']);
@@ -23,7 +26,12 @@ $userMenuActions = [
         respond($items);
     },
     'getCategories' => function ($conn, $body) {
-        $result = $conn->query("SELECT categoryID, name FROM categories ORDER BY categoryID");
+        $result = $conn->query(
+            "SELECT categoryID, name
+             FROM categories
+             WHERE COALESCE(is_deleted, 0) = 0
+             ORDER BY categoryID"
+        );
         respond(fetchAllRows($result, ['categoryID']));
     },
 ];

@@ -124,8 +124,14 @@ function findAccount($conn, $table, $idField, $role, $username, $password) {
 }
 
 function executePrepared($stmt, $errorMessage) {
-    if (!$stmt->execute()) {
-        $message = $errorMessage . ': ' . $stmt->error;
+    try {
+        if (!$stmt->execute()) {
+            $message = $errorMessage . ': ' . $stmt->error;
+            $stmt->close();
+            respondError($message);
+        }
+    } catch (mysqli_sql_exception $e) {
+        $message = $errorMessage . ': ' . $e->getMessage();
         $stmt->close();
         respondError($message);
     }

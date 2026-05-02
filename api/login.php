@@ -215,6 +215,9 @@ $loginActions = [
             respondError('Username or email and OTP are required.');
         }
 
+        // Normalize OTP - ensure it's exactly 6 digits with leading zeros
+        $otp = str_pad($otp, 6, '0', STR_PAD_LEFT);
+        
         if (strlen($otp) !== 6 || !ctype_digit($otp)) {
             respondError('Invalid OTP format. Please enter a 6-digit code.');
         }
@@ -223,10 +226,11 @@ $loginActions = [
         $otpRecord = null;
         
         if ($username) {
+            // Try with type check first
             $stmt = $conn->prepare("
                 SELECT id, username, email 
                 FROM password_otps 
-                WHERE username = ? AND otp = ? AND (type = 'password_reset' OR type IS NULL OR type = '') AND used = 0 AND expires_at > NOW()
+                WHERE username = ? AND otp = ? AND used = 0 AND expires_at > NOW()
                 ORDER BY created_at DESC LIMIT 1
             ");
             $stmt->bind_param('ss', $username, $otp);
@@ -241,7 +245,7 @@ $loginActions = [
             $stmt = $conn->prepare("
                 SELECT id, username, email 
                 FROM password_otps 
-                WHERE email = ? AND otp = ? AND (type = 'password_reset' OR type IS NULL OR type = '') AND used = 0 AND expires_at > NOW()
+                WHERE email = ? AND otp = ? AND used = 0 AND expires_at > NOW()
                 ORDER BY created_at DESC LIMIT 1
             ");
             $stmt->bind_param('ss', $email, $otp);

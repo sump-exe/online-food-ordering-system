@@ -4,9 +4,12 @@ export const state = {
     currentPage: 'login',
     adminPage: 'menu',
     firstLoad: true,
+    customerMenuSearch: '',
     menuItems: [],
+    deletedMenuItems: [],
     categories: [],
     adminCategories: [],
+    deletedAdminCategories: [],
     orders: [],
     users: [],
     salesByDate: [],
@@ -15,14 +18,18 @@ export const state = {
     currentResetUsername: null,
     isOrderHistoryOpen: false,
     isCartOpen: false,
-    adminOrderFilter: {
-        user: '',
-        status: ''
-    },
     salesFilter: {
-        year: '',
-        month: '',
-        day: '',
-        user: ''
+        period: 'monthly',
+        startDate: null,
+        endDate: null
     },
+    salesReport: {
+        totalSales: 0,
+        orderCount: 0
+    },
+    orderStats: {
+        Preparing: 0,
+        Complete: 0,
+        Cancelled: 0
+    }
 };
