@@ -103,7 +103,7 @@ function sendOTPEmail($email, $otp, $username) {
                     <p>Hello <strong>' . htmlspecialchars($username) . '</strong>,</p>
                     <p>We received a request to reset your password. Use the OTP below to verify your identity:</p>
                     <div class="otp-box">' . $otp . '</div>
-                    <p>This OTP will expire in <strong>10 minutes</strong>.</p>
+                    <p>This OTP will expire in <strong>2 minutes</strong>.</p>
                     <p>If you did not request this password reset, please ignore this email or contact support.</p>
                 </div>
                 <div class="footer">
@@ -113,7 +113,7 @@ function sendOTPEmail($email, $otp, $username) {
         </body>
         </html>
         ';
-        $mail->AltBody = "Hello $username,\n\nWe received a request to reset your password. Your OTP is: $otp\n\nThis OTP will expire in 10 minutes.\n\nIf you did not request this password reset, please ignore this email.";
+        $mail->AltBody = "Hello $username,\n\nWe received a request to reset your password. Your OTP is: $otp\n\nThis OTP will expire in 2 minutes.\n\nIf you did not request this password reset, please ignore this email.";
         
         $mail->send();
         return ['success' => true, 'message' => 'OTP sent successfully'];
@@ -253,7 +253,7 @@ function sendVerificationEmail($email, $otp, $username) {
                     <p>Hello <strong>' . htmlspecialchars($username) . '</strong>,</p>
                     <p>Thank you for registering! Use the OTP below to verify your email address:</p>
                     <div class="otp-box">' . $otp . '</div>
-                    <p>This OTP will expire in <strong>24 hours</strong>.</p>
+                    <p>This OTP will expire in <strong>2 minutes</strong>.</p>
                     <p>If you did not create an account, please ignore this email.</p>
                 </div>
                 <div class="footer">
@@ -263,7 +263,7 @@ function sendVerificationEmail($email, $otp, $username) {
         </body>
         </html>
         ';
-        $mail->AltBody = "Hello $username,\n\nThank you for registering! Your verification OTP is: $otp\n\nThis OTP will expire in 24 hours.\n\nIf you did not create an account, please ignore this email.";
+        $mail->AltBody = "Hello $username,\n\nThank you for registering! Your verification OTP is: $otp\n\nThis OTP will expire in 2 minutes.\n\nIf you did not create an account, please ignore this email.";
         
         $mail->send();
         return ['success' => true, 'message' => 'Verification email sent successfully'];

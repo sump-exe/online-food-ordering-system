@@ -3,6 +3,14 @@ import { state } from './state.js';
 
 const logoUrl = new URL('../img/logo.png', import.meta.url).href;
 
+function normalizeOtpInput(value) {
+    const digitsOnly = String(value ?? '').replace(/\D/g, '');
+    if (digitsOnly.length === 0 || digitsOnly.length > 6) {
+        return '';
+    }
+    return digitsOnly.padStart(6, '0');
+}
+
 export async function login(username, password) {
     const data = await apiGet('login', { username, password });
     if (data.user) {
@@ -232,6 +240,7 @@ function showForgotPasswordDialog() {
                     </div>
                 </div>
                 <div id="forgotPasswordStep3" style="display:none;">
+                    <p style="color:#666;font-size:0.9rem;margin-bottom:12px;">OTP verified. Set your new password below.</p>
                     <div class="form-group">
                         <label>New Password</label>
                         <input type="password" id="newResetPassword" placeholder="Enter new password">
@@ -239,6 +248,12 @@ function showForgotPasswordDialog() {
                     <div class="form-group">
                         <label>Confirm New Password</label>
                         <input type="password" id="confirmResetPassword" placeholder="Confirm new password">
+                    </div>
+                    <div style="background:#fff5e6;padding:12px;border-radius:12px;margin-bottom:16px;">
+                        <small style="color:#ff5722;">Password Requirements:</small><br>
+                        <small style="color:#666;">- At least 8 characters long</small><br>
+                        <small style="color:#666;">- At least 1 uppercase letter (A-Z)</small><br>
+                        <small style="color:#666;">- At least 1 special character (!@#$%^&*())</small>
                     </div>
                     <button id="confirmResetBtn" class="btn-primary" style="width:100%;padding:12px;">Reset Password</button>
                 </div>
@@ -257,6 +272,9 @@ let currentUsername = '';
 
     document.getElementById('closeForgotPasswordBtn').addEventListener('click', closeForgotPasswordModal);
     document.getElementById('backFromForgotLink').addEventListener('click', closeForgotPasswordModal);
+    document.getElementById('otpInput')?.addEventListener('input', (e) => {
+        e.target.value = String(e.target.value).replace(/\D/g, '').slice(0, 6);
+    });
     
     // Step 1: Request OTP
     document.getElementById('requestResetBtn').addEventListener('click', async () => {
@@ -289,17 +307,19 @@ try {
 
     // Step 2: Verify OTP
     document.getElementById('verifyOtpBtn').addEventListener('click', async () => {
-        const otp = document.getElementById('otpInput').value;
+        const otp = normalizeOtpInput(document.getElementById('otpInput').value);
         const msgDiv = document.getElementById('forgotPasswordMessage');
 
-        if (!otp || otp.length !== 6) {
+        if (otp.length !== 6) {
             msgDiv.innerHTML = '<div class="error-message">Please enter a valid 6-digit OTP</div>';
             return;
         }
 
-try {
+        document.getElementById('otpInput').value = otp;
+
+        try {
             const result = await verifyOTP(currentUsername, otp, currentEmail); // Pass email for verification
-            currentOTP = otp;
+            currentOTP = result.otp || otp;
             msgDiv.innerHTML = '<div class="success-message">OTP verified! Now set your new password.</div>';
             // Show Step 3
             document.getElementById('forgotPasswordStep2').style.display = 'none';
@@ -487,15 +507,16 @@ document.getElementById('doRegisterBtn').addEventListener('click', async () => {
     // Verify Registration OTP and create account
     document.getElementById('verifyRegBtn')?.addEventListener('click', async () => {
         const username = document.getElementById('regUsername').value;
-        const otp = document.getElementById('regOtpInput').value;
+        const otp = normalizeOtpInput(document.getElementById('regOtpInput').value);
         const password = document.getElementById('regOtpPassword').value;
         const confirmPassword = document.getElementById('regOtpConfirmPassword').value;
         const msgDiv = document.getElementById('registerMessage');
 
-        if (!otp || otp.length !== 6) {
+        if (otp.length !== 6) {
             msgDiv.innerHTML = '<div class="error-message">Please enter a valid 6-digit OTP</div>';
             return;
         }
+        document.getElementById('regOtpInput').value = otp;
         if (!password || !confirmPassword) {
             msgDiv.innerHTML = '<div class="error-message">Please fill all password fields</div>';
             return;
@@ -527,6 +548,9 @@ document.getElementById('doRegisterBtn').addEventListener('click', async () => {
     // Allow Enter key for OTP input
     document.getElementById('regOtpInput')?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') document.getElementById('verifyRegBtn')?.click();
+    });
+    document.getElementById('regOtpInput')?.addEventListener('input', (e) => {
+        e.target.value = String(e.target.value).replace(/\D/g, '').slice(0, 6);
     });
     document.getElementById('regOtpPassword')?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') document.getElementById('verifyRegBtn')?.click();

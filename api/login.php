@@ -2,6 +2,28 @@
 
 require_once __DIR__ . '/email_helper.php';
 
+const OTP_EXPIRY_MINUTES = 2;
+
+function normalizeOtpInput($otp) {
+    $otp = trim((string)$otp);
+
+    if ($otp === '' || !ctype_digit($otp)) {
+        return null;
+    }
+
+    return str_pad($otp, 6, '0', STR_PAD_LEFT);
+}
+
+function createOtpRecord($conn, $username, $email, $otp, $type) {
+    $stmt = $conn->prepare("
+        INSERT INTO password_otps (username, email, otp, expires_at, type)
+        VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL " . OTP_EXPIRY_MINUTES . " MINUTE), ?)
+    ");
+    $stmt->bind_param('ssss', $username, $email, $otp, $type);
+    executePrepared($stmt, 'Failed to create OTP');
+    $stmt->close();
+}
+
 $loginActions = [
     'login' => function ($conn, $body) {
         $username = $_GET['username'] ?? '';
@@ -58,7 +80,6 @@ $loginActions = [
 
         // Generate 6-digit OTP for email verification
         $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $otpExpiry = date('Y-m-d H:i:s', strtotime('+24 hours')); // 24 hours for registration
 
         // Delete any existing OTPs for this email/username
         $stmt = $conn->prepare("DELETE FROM password_otps WHERE (username = ? OR email = ?) AND type = 'registration' AND used = 0");
@@ -67,10 +88,7 @@ $loginActions = [
         $stmt->close();
 
         // Insert OTP with type = registration
-        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at, type) VALUES (?, ?, ?, ?, 'registration')");
-        $stmt->bind_param('ssss', $username, $email, $otp, $otpExpiry);
-        executePrepared($stmt, 'Failed to create verification OTP');
-        $stmt->close();
+        createOtpRecord($conn, $username, $email, $otp, 'registration');
 
         // Send verification OTP via email
         $emailResult = sendVerificationEmail($email, $otp, $username);
@@ -87,7 +105,7 @@ $loginActions = [
     },
     'verifyRegistration' => function ($conn, $body) {
         $username = $body['username'] ?? '';
-        $otp = $body['otp'] ?? '';
+        $otp = normalizeOtpInput($body['otp'] ?? '');
         $password = $body['password'] ?? '';
 
         if (!$username || !$otp || !$password) {
@@ -179,7 +197,6 @@ $loginActions = [
 
 // Generate 6-digit OTP
         $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $otpExpiry = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 
         // Delete any existing unused password_reset OTPs for this username
         $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND used = 0 AND (type = 'password_reset' OR type IS NULL OR type = '')");
@@ -188,10 +205,7 @@ $loginActions = [
         $stmt->close();
 
         // Insert new OTP with explicit type
-        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at, type) VALUES (?, ?, ?, ?, 'password_reset')");
-        $stmt->bind_param('ssss', $username, $email, $otp, $otpExpiry);
-        executePrepared($stmt, 'Failed to create OTP');
-        $stmt->close();
+        createOtpRecord($conn, $username, $email, $otp, 'password_reset');
 
         // Send OTP via email
         $emailResult = sendOTPEmail($email, $otp, $username);
@@ -208,16 +222,13 @@ $loginActions = [
     },
 'verifyOTP' => function ($conn, $body) {
         $username = $body['username'] ?? '';
-        $otp = $body['otp'] ?? '';
+        $otp = normalizeOtpInput($body['otp'] ?? '');
         $email = $body['email'] ?? ''; // Optional: allow email for verification
 
         if ((!$username && !$email) || !$otp) {
             respondError('Username or email and OTP are required.');
         }
 
-        // Normalize OTP - ensure it's exactly 6 digits with leading zeros
-        $otp = str_pad($otp, 6, '0', STR_PAD_LEFT);
-        
         if (strlen($otp) !== 6 || !ctype_digit($otp)) {
             respondError('Invalid OTP format. Please enter a 6-digit code.');
         }
@@ -230,7 +241,7 @@ $loginActions = [
             $stmt = $conn->prepare("
                 SELECT id, username, email 
                 FROM password_otps 
-                WHERE username = ? AND otp = ? AND used = 0 AND expires_at > NOW()
+                WHERE username = ? AND otp = ? AND (type = 'password_reset' OR type IS NULL OR type = '') AND used = 0 AND expires_at > NOW()
                 ORDER BY created_at DESC LIMIT 1
             ");
             $stmt->bind_param('ss', $username, $otp);
@@ -245,7 +256,7 @@ $loginActions = [
             $stmt = $conn->prepare("
                 SELECT id, username, email 
                 FROM password_otps 
-                WHERE email = ? AND otp = ? AND used = 0 AND expires_at > NOW()
+                WHERE email = ? AND otp = ? AND (type = 'password_reset' OR type IS NULL OR type = '') AND used = 0 AND expires_at > NOW()
                 ORDER BY created_at DESC LIMIT 1
             ");
             $stmt->bind_param('ss', $email, $otp);
@@ -272,6 +283,7 @@ $loginActions = [
             'success' => true,
             'message' => 'OTP verified successfully. You can now reset your password.',
             'username' => $verifiedUsername,
+            'otp' => $otp,
         ]);
     },
     'resendOTP' => function ($conn, $body) {
@@ -309,7 +321,6 @@ $loginActions = [
 
         // Generate new 6-digit OTP
         $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $otpExpiry = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 
 // Delete any existing unused password_reset OTPs for this username
         $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND used = 0 AND (type = 'password_reset' OR type IS NULL OR type = '')");
@@ -318,10 +329,7 @@ $loginActions = [
         $stmt->close();
 
         // Insert new OTP with explicit type
-        $stmt = $conn->prepare("INSERT INTO password_otps (username, email, otp, expires_at, type) VALUES (?, ?, ?, ?, 'password_reset')");
-        $stmt->bind_param('ssss', $username, $email, $otp, $otpExpiry);
-        executePrepared($stmt, 'Failed to create OTP');
-        $stmt->close();
+        createOtpRecord($conn, $username, $email, $otp, 'password_reset');
 
         // Send OTP via email
         $emailResult = sendOTPEmail($email, $otp, $username);
@@ -337,7 +345,7 @@ $loginActions = [
         ]);
     },
 'resetPassword' => function ($conn, $body) {
-        $otp = $body['otp'] ?? '';
+        $otp = normalizeOtpInput($body['otp'] ?? '');
         $username = $body['username'] ?? '';
         $email = $body['email'] ?? ''; // Optional email for verification
         $newPassword = $body['newPassword'] ?? '';
@@ -359,7 +367,7 @@ $loginActions = [
         $stmt = $conn->prepare("
             SELECT id, email 
             FROM password_otps 
-            WHERE username = ? AND otp = ? AND (type = 'password_reset' OR type IS NULL OR type = '') AND used = 1
+            WHERE username = ? AND otp = ? AND (type = 'password_reset' OR type IS NULL OR type = '') AND used = 1 AND expires_at > NOW()
             ORDER BY created_at DESC LIMIT 1
         ");
         $stmt->bind_param('ss', $username, $otp);
