@@ -10,8 +10,7 @@ require __DIR__ . '/api/sales-report-admin.php';
 require __DIR__ . '/api/order-history-admin.php';
 require __DIR__ . '/api/users-management-admin.php';
 require __DIR__ . '/api/category-management-admin.php';
-require __DIR__ . '/api/payment-receipt.php';
-
+require __DIR__ . '/api/tags-management-admin.php';
 
 $routes = [
     'login' => $loginActions,
@@ -23,26 +22,18 @@ $routes = [
     'order_history_admin' => $adminOrderHistoryActions,
     'users_management_admin' => $adminUsersManagementActions,
     'category_management_admin' => $adminCategoryActions,
-    'payment_receipt' => $paymentReceiptActions,
+    'tags_management_admin' => $adminTagsActions,
 ];
 
 $actionMap = [
     // Login & Authentication
     'login' => ['group' => 'login', 'handler' => 'login'],
     'register' => ['group' => 'login', 'handler' => 'register'],
-    'verifyRegistration' => ['group' => 'login', 'handler' => 'verifyRegistration'],
     'forgotPassword' => ['group' => 'login', 'handler' => 'forgotPassword'],
-    'verifyOTP' => ['group' => 'login', 'handler' => 'verifyOTP'],
-    'resendOTP' => ['group' => 'login', 'handler' => 'resendOTP'],
     'resetPassword' => ['group' => 'login', 'handler' => 'resetPassword'],
     'verifyResetToken' => ['group' => 'login', 'handler' => 'verifyResetToken'],
-    'getAccountSettings' => ['group' => 'login', 'handler' => 'getAccountSettings'],
-    'updateAccountSettings' => ['group' => 'login', 'handler' => 'updateAccountSettings'],
-    'deleteAccount' => ['group' => 'login', 'handler' => 'deleteAccount'],
     
     // Cart & Orders
-    'saveCartToDb' => ['group' => 'cart_user', 'handler' => 'saveCartToDb'],
-    'loadCartFromDb' => ['group' => 'cart_user', 'handler' => 'loadCartFromDb'],
     'createOrder' => ['group' => 'cart_user', 'handler' => 'createOrder'],
     
     // Order History
@@ -85,10 +76,13 @@ $actionMap = [
     'updateCategory' => ['group' => 'category_management_admin', 'handler' => 'updateCategory'],
     'deleteCategory' => ['group' => 'category_management_admin', 'handler' => 'deleteCategory'],
     'reassignMenuItems' => ['group' => 'category_management_admin', 'handler' => 'reassignMenuItems'],
-
-    'processPayment' => ['group' => 'payment_receipt', 'handler' => 'processPayment'],
-    'getReceipt' => ['group' => 'payment_receipt', 'handler' => 'getReceipt'],
-    'getReceiptsByCustomer' => ['group' => 'payment_receipt', 'handler' => 'getReceiptsByCustomer'],
+    
+    // Admin Tags Management
+    'getTags' => ['group' => 'tags_management_admin', 'handler' => 'getTags'],
+    'addTag' => ['group' => 'tags_management_admin', 'handler' => 'addTag'],
+    'updateTag' => ['group' => 'tags_management_admin', 'handler' => 'updateTag'],
+    'deleteTag' => ['group' => 'tags_management_admin', 'handler' => 'deleteTag'],
+    'getTagById' => ['group' => 'tags_management_admin', 'handler' => 'getTagById'],
 ];
 
 if (!isset($actionMap[$action])) {

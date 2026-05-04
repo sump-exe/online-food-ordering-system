@@ -22,6 +22,11 @@ import {
     renderInventoryPage, 
     attachInventoryEvents 
 } from './stock-inventory.js';
+import { 
+    loadTags, 
+    renderTagsPage, 
+    attachTagsEvents 
+} from './tags-management.js';
 
 function getRoot() {
     return document.getElementById('app');
@@ -38,6 +43,9 @@ function renderAdminPageContent() {
     }
     if (state.adminPage === 'categories') {
         return renderAdminCategoriesPage();
+    }
+    if (state.adminPage === 'tags') {
+        return renderTagsPage();
     }
     if (state.adminPage === 'orders') {
         return renderAdminOrdersPage();
@@ -85,6 +93,15 @@ export function renderInPlace() {
                 },
                 setAdminMessage: (msg, type) => {
                     console.log(`${type}: ${msg}`);
+                }
+            });
+        }
+        
+        if (state.adminPage === 'tags') {
+            attachTagsEvents({
+                renderApp,
+                refreshTags: async () => {
+                    await loadTags();
                 }
             });
         }
@@ -138,6 +155,7 @@ export async function renderApp() {
                 loadMenuItems(),
                 loadFoodCategories(),
                 loadAdminCategories(),
+                loadTags(),
                 loadAdminOrders(),
                 loadAdminSalesData(),
                 loadUsers(),

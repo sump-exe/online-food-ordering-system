@@ -13,17 +13,17 @@ export async function loadCategories() {
 
 export function renderAdminNavBar() {
     const navItems = [
-        { id: 'menu', label: 'Menu & Inventory', icon: 'M' },
-        { id: 'categories', label: 'Categories', icon: 'C' },
-        { id: 'orders', label: 'All Orders', icon: 'O' },
-        { id: 'sales', label: 'Sales Reports', icon: 'S' },
-        { id: 'inventory', label: 'Stock Inventory', icon: 'I' },
-        { id: 'users', label: 'Users', icon: 'U' },
+        { id: 'menu', label: 'Menu & Inventory' },
+        { id: 'categories', label: 'Categories' },
+        { id: 'tags', label: 'Tags' },
+        { id: 'orders', label: 'All Orders' },
+        { id: 'sales', label: 'Sales Reports' },
+        { id: 'inventory', label: 'Stock Inventory' },
+        { id: 'users', label: 'Users' },
     ];
 
     const navLinksHtml = navItems.map((item) => `
         <button class="admin-nav-item ${state.adminPage === item.id ? 'active' : ''}" data-page="${item.id}">
-            <span class="admin-nav-icon" aria-hidden="true">${item.icon}</span>
             <span class="admin-nav-label">${item.label}</span>
         </button>
     `).join('');
@@ -59,8 +59,8 @@ export function renderAdminMenuPage() {
                     🗑️ Delete
                 </button>
             </td>
-        </tr>
-    `).join('');
+         `
+    ).join('');
 
     const categoryOptions = (state.categories || []).map((category) => (
         `<option value="${category.categoryID}">${escapeHtml(category.name)}</option>`
@@ -115,7 +115,7 @@ export function renderAdminMenuPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${rowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No items found.</td></tr>'}
+                        ${rowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No items found. </td></tr>'}
                     </tbody>
                 </table>
             </div>
