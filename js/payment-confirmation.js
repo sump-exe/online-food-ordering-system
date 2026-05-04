@@ -1,10 +1,8 @@
-import { apiPost } from './api.js';
 import { state } from './state.js';
-import { placeOrder } from './cart-user.js';
 
 export function getCartSummaryHtml() {
     if (state.customerCart.length === 0) {
-        return '<p style=\"text-align:center;color:#aaa;padding:32px 0;\">No items in cart</p>';
+        return '<p style="text-align:center;color:#aaa;padding:32px 0;">No items in cart</p>';
     }
 
     let itemsHtml = '';
@@ -38,9 +36,9 @@ function escapeHtml(str) {
     if (!str) return '';
     return String(str)
         .replace(/&/g, '&amp;')
-        .replace(/</g, '<')
-        .replace(/>/g, '>')
-        .replace(/"/g, '"')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
 
@@ -56,6 +54,7 @@ export function openPaymentConfirmationDrawer(renderInPlace, renderApp) {
     }
 
     const summaryHtml = getCartSummaryHtml();
+    const totalPaid = state.customerCart.reduce((sum, item) => sum + (item.price * item.quantity), 0) / 100;
 
     const drawerHtml = `
     <div id="paymentOverlay" class="payment-overlay open"></div>
@@ -69,10 +68,10 @@ export function openPaymentConfirmationDrawer(renderInPlace, renderApp) {
         </div>
         <div class="order-history-drawer-body">
             <div id="paymentMessage"></div>
-            
-            <div class="payment-method-info" style="background:#f8f9fa;padding:16px;border-radius:12px;border:1px solid #e9ecef;margin-bottom:20px;">
-                <div style="font-weight:700;color:#1a1118;margin-bottom:4px;">Payment Method: Cash on Counter</div>
-                <small style="color:#6c757d;">Pay cash when your order is ready for pickup/delivery</small>
+
+            <div class="payment-method-info">
+                <div class="payment-method-title">Payment Method: Cash on Counter</div>
+                <small>Pay cash when your order is ready for pickup or delivery.</small>
             </div>
 
             ${summaryHtml}
@@ -95,30 +94,30 @@ export function openPaymentConfirmationDrawer(renderInPlace, renderApp) {
     document.getElementById('paymentOverlay')?.addEventListener('click', closePayment);
     document.getElementById('cancelPaymentBtn')?.addEventListener('click', closePayment);
 
-        document.getElementById('confirmPaymentBtn')?.addEventListener('click', async () => {
+    document.getElementById('confirmPaymentBtn')?.addEventListener('click', async () => {
         const msgDiv = document.getElementById('paymentMessage');
 
         try {
             msgDiv.innerHTML = '<div style="text-align:center;padding:20px;"><div style="width:24px;height:24px;border:2px solid #ffe0c4;border-top:2px solid #ff5722;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px;"></div>Processing your order...</div>';
 
-            // Call confirmPayment (creates order directly)
-            const result = await import('./cart-user.js').then(module => {
-                return module.confirmPayment();
+            const result = await import('./cart-user.js').then((module) => {
+                return module.confirmPayment({
+                    paymentMethod: 'Cash',
+                    amountPaid: totalPaid,
+                    renderApp
+                });
             });
 
             msgDiv.innerHTML = `<div class="success-message" style="text-align:center;padding:20px;">
-                <div style="font-size:1.4rem;font-weight:800;color:#10b981;margin-bottom:8px;">Order #${result.OrderID} Confirmed!</div>
-                <div style="font-size:0.95rem;color:#6c757d;margin-bottom:12px;">Cash on Counter • Total: P${(result.TotalPayment / 100).toFixed(2)}</div>
+                <div style="font-size:1.4rem;font-weight:800;color:#10b981;margin-bottom:8px;">Order #${result.order.OrderID} Confirmed!</div>
+                <div style="font-size:0.95rem;color:#6c757d;margin-bottom:12px;">Receipt ${result.payment.receipt_number} | Total: P${result.payment.total_amount.toFixed(2)}</div>
             </div>`;
 
             setTimeout(() => {
                 closePayment();
-                renderApp();
             }, 2500);
-
         } catch (error) {
             msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
         }
     });
 }
-
