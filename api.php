@@ -23,24 +23,15 @@ $routes = [
     'category_management_admin' => $adminCategoryActions,
 ];
 
-
 $actionMap = [
     // Login & Authentication
     'login' => ['group' => 'login', 'handler' => 'login'],
     'register' => ['group' => 'login', 'handler' => 'register'],
-    'verifyRegistration' => ['group' => 'login', 'handler' => 'verifyRegistration'],
     'forgotPassword' => ['group' => 'login', 'handler' => 'forgotPassword'],
-    'verifyOTP' => ['group' => 'login', 'handler' => 'verifyOTP'],
-    'resendOTP' => ['group' => 'login', 'handler' => 'resendOTP'],
     'resetPassword' => ['group' => 'login', 'handler' => 'resetPassword'],
     'verifyResetToken' => ['group' => 'login', 'handler' => 'verifyResetToken'],
-    'getAccountSettings' => ['group' => 'login', 'handler' => 'getAccountSettings'],
-    'updateAccountSettings' => ['group' => 'login', 'handler' => 'updateAccountSettings'],
-    'deleteAccount' => ['group' => 'login', 'handler' => 'deleteAccount'],
     
     // Cart & Orders
-    'saveCartToDb' => ['group' => 'cart_user', 'handler' => 'saveCartToDb'],
-    'loadCartFromDb' => ['group' => 'cart_user', 'handler' => 'loadCartFromDb'],
     'createOrder' => ['group' => 'cart_user', 'handler' => 'createOrder'],
     
     // Order History
@@ -48,11 +39,11 @@ $actionMap = [
         'group' => isset($_GET['customerId']) ? 'order_history_user' : 'order_history_admin',
         'handler' => isset($_GET['customerId']) ? 'getOrders' : 'getAllOrders',
     ],
-    'getOrderDetails' => ['group' => 'order_history_admin', 'handler' => 'getOrderDetails'],
     'updateOrderStatus' => [
         'group' => (($body['status'] ?? '') === 'Cancelled') ? 'order_history_user' : 'order_history_admin',
         'handler' => (($body['status'] ?? '') === 'Cancelled') ? 'updateOrderStatus' : 'updateOrderStatusAdmin',
     ],
+    'getOrderDetails' => ['group' => 'order_history_admin', 'handler' => 'getOrderDetails'],
     
     // Menu (User)
     'getMenuItems' => ['group' => 'menu_user', 'handler' => 'getMenuItems'],
@@ -60,14 +51,11 @@ $actionMap = [
     
     // Admin Menu & Inventory
     'addMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'addMenuItem'],
-    'getDeletedMenuItems' => ['group' => 'menu_inventory_admin', 'handler' => 'getDeletedMenuItems'],
     'getMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'getMenuItem'],
     'updateMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'updateMenuItem'],
+    'deleteMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'deleteMenuItem'],
     'updateStock' => ['group' => 'menu_inventory_admin', 'handler' => 'updateStock'],
     'updatePrice' => ['group' => 'menu_inventory_admin', 'handler' => 'updatePrice'],
-    'deleteMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'deleteMenuItem'],
-    'restoreMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'restoreMenuItem'],
-    'permanentlyDeleteMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'permanentlyDeleteMenuItem'],
     
     // Admin Sales Reports
     'getSalesReport' => ['group' => 'sales_report_admin', 'handler' => 'getSalesReport'],
@@ -80,13 +68,11 @@ $actionMap = [
     
     // Admin Category Management
     'getAdminCategories' => ['group' => 'category_management_admin', 'handler' => 'getCategories'],
-    'getDeletedCategories' => ['group' => 'category_management_admin', 'handler' => 'getDeletedCategories'],
+    'getCategoriesByType' => ['group' => 'category_management_admin', 'handler' => 'getCategoriesByType'],
     'getMenuItemsByCategory' => ['group' => 'category_management_admin', 'handler' => 'getMenuItemsByCategory'],
     'addCategory' => ['group' => 'category_management_admin', 'handler' => 'addCategory'],
     'updateCategory' => ['group' => 'category_management_admin', 'handler' => 'updateCategory'],
     'deleteCategory' => ['group' => 'category_management_admin', 'handler' => 'deleteCategory'],
-    'restoreCategory' => ['group' => 'category_management_admin', 'handler' => 'restoreCategory'],
-    'permanentlyDeleteCategory' => ['group' => 'category_management_admin', 'handler' => 'permanentlyDeleteCategory'],
     'reassignMenuItems' => ['group' => 'category_management_admin', 'handler' => 'reassignMenuItems'],
 ];
 

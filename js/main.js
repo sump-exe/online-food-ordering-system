@@ -3,10 +3,8 @@ import { checkForResetToken, logout, renderAuthScreen } from './login.js';
 import {
     attachAdminMenuInventoryEvents,
     loadCategories as loadFoodCategories,
-    loadDeletedMenuItems,
     loadMenuItems,
     renderAdminMenuPage,
-    renderAdminTrashPage,
     renderAdminNavBar,
 } from './menu-inventory-admin.js';
 import { loadAdminSalesData, renderAdminSalesPage, attachSalesEvents } from './sales-report-admin.js';
@@ -16,10 +14,14 @@ import { loadUserOrders } from './order-history-user.js';
 import { attachCustomerEvents, renderCustomerPage } from './menu-user.js';
 import { 
     loadCategories as loadAdminCategories, 
-    loadDeletedCategories,
     renderAdminCategoriesPage, 
     attachCategoryEvents 
 } from './category-management-admin.js';
+import { 
+    loadInventoryData, 
+    renderInventoryPage, 
+    attachInventoryEvents 
+} from './stock-inventory.js';
 
 function getRoot() {
     return document.getElementById('app');
@@ -34,9 +36,6 @@ function renderAdminPageContent() {
     if (state.adminPage === 'menu') {
         return renderAdminMenuPage();
     }
-    if (state.adminPage === 'trash') {
-        return renderAdminTrashPage();
-    }
     if (state.adminPage === 'categories') {
         return renderAdminCategoriesPage();
     }
@@ -45,6 +44,9 @@ function renderAdminPageContent() {
     }
     if (state.adminPage === 'sales') {
         return renderAdminSalesPage();
+    }
+    if (state.adminPage === 'inventory') {
+        return renderInventoryPage();
     }
     if (state.adminPage === 'users') {
         return renderAdminUsersPage();
@@ -75,14 +77,11 @@ export function renderInPlace() {
         root.innerHTML = renderAdminLayout();
         attachAdminMenuInventoryEvents({ renderApp, setAdminPage, logout });
         
-        if (state.adminPage === 'categories' || state.adminPage === 'trash') {
+        if (state.adminPage === 'categories') {
             attachCategoryEvents({ 
                 renderApp, 
                 refreshCategories: async () => {
-                    await Promise.all([
-                        loadAdminCategories(),
-                        loadDeletedCategories(),
-                    ]);
+                    await loadAdminCategories();
                 },
                 setAdminMessage: (msg, type) => {
                     console.log(`${type}: ${msg}`);
@@ -99,6 +98,15 @@ export function renderInPlace() {
                 renderApp,
                 loadSalesData: async () => {
                     await loadAdminSalesData();
+                }
+            });
+        }
+        
+        if (state.adminPage === 'inventory') {
+            attachInventoryEvents({
+                renderApp,
+                refreshInventory: async () => {
+                    await loadInventoryData();
                 }
             });
         }
@@ -128,13 +136,12 @@ export async function renderApp() {
         if (state.currentUser.role === 'admin') {
             await Promise.all([
                 loadMenuItems(),
-                loadDeletedMenuItems(),
                 loadFoodCategories(),
                 loadAdminCategories(),
-                loadDeletedCategories(),
                 loadAdminOrders(),
                 loadAdminSalesData(),
                 loadUsers(),
+                loadInventoryData(),
             ]);
         } else {
             await Promise.all([

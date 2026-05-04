@@ -18,7 +18,7 @@ $adminMenuInventoryActions = [
         }
 
         $stmt = $conn->prepare(
-            "INSERT INTO menu_items (name, price, stock, categoryID) VALUES (?, ?, ?, ?)"
+            "INSERT INTO menu_items (name, price, stock, categoryID, timeToPrepare) VALUES (?, ?, ?, ?, NOW())"
         );
         $stmt->bind_param('siii', $name, $price, $stock, $categoryID);
         executePrepared($stmt, 'Failed to add item');
@@ -34,109 +34,7 @@ $adminMenuInventoryActions = [
             'available'   => $stock > 0,
         ]);
     },
-    'getDeletedMenuItems' => function ($conn, $body) {
-        $result = $conn->query(
-            "SELECT m.itemID,
-                    COALESCE(m.name, CONCAT('Item #', m.itemID)) AS name,
-                    m.price,
-                    m.stock,
-                    m.categoryID AS categoryID,
-                    c.name AS category_name,
-                    m.deleted_at
-             FROM menu_items m
-             LEFT JOIN categories c
-                    ON c.categoryID = m.categoryID
-                   AND COALESCE(c.is_deleted, 0) = 0
-             WHERE COALESCE(m.is_deleted, 0) = 1
-             ORDER BY m.deleted_at DESC, m.itemID DESC"
-        );
-
-        respond(fetchAllRows($result, ['itemID', 'price', 'stock', 'categoryID']));
-    },
-    'deleteMenuItem' => function ($conn, $body) {
-        $itemId = (int)($body['itemId'] ?? 0);
-
-        if ($itemId <= 0) {
-            respondError('Invalid item ID.');
-        }
-
-        $stmt = $conn->prepare(
-            "UPDATE menu_items
-             SET is_deleted = 1, deleted_at = NOW()
-             WHERE itemID = ? AND COALESCE(is_deleted, 0) = 0"
-        );
-        $stmt->bind_param('i', $itemId);
-        executePrepared($stmt, 'Failed to move item to trash');
-        $affectedRows = $stmt->affected_rows;
-        $stmt->close();
-
-        if ($affectedRows === 0) {
-            respondError('Item not found or already deleted.', 404);
-        }
-
-        respondSuccess();
-    },
-    'restoreMenuItem' => function ($conn, $body) {
-        $itemId = (int)($body['itemId'] ?? 0);
-
-        if ($itemId <= 0) {
-            respondError('Invalid item ID.');
-        }
-
-        $stmt = $conn->prepare(
-            "UPDATE menu_items
-             SET is_deleted = 0, deleted_at = NULL
-             WHERE itemID = ? AND COALESCE(is_deleted, 0) = 1"
-        );
-        $stmt->bind_param('i', $itemId);
-        executePrepared($stmt, 'Failed to restore item');
-        $affectedRows = $stmt->affected_rows;
-        $stmt->close();
-
-        if ($affectedRows === 0) {
-            respondError('Item not found in trash.', 404);
-        }
-
-        respondSuccess();
-    },
-    'permanentlyDeleteMenuItem' => function ($conn, $body) {
-        $itemId = (int)($body['itemId'] ?? 0);
-
-        if ($itemId <= 0) {
-            respondError('Invalid item ID.');
-        }
-
-        $checkStmt = $conn->prepare(
-            "SELECT COUNT(*) AS reference_count
-             FROM orderitems
-             WHERE ItemID = ?"
-        );
-        $checkStmt->bind_param('i', $itemId);
-        executePrepared($checkStmt, 'Failed to check item references');
-        $referenceCount = (int)($checkStmt->get_result()->fetch_assoc()['reference_count'] ?? 0);
-        $checkStmt->close();
-
-        if ($referenceCount > 0) {
-            respondError('This item cannot be permanently deleted because it is referenced by existing orders.', 409);
-        }
-
-        $stmt = $conn->prepare(
-            "DELETE FROM menu_items
-             WHERE itemID = ? AND COALESCE(is_deleted, 0) = 1"
-        );
-        $stmt->bind_param('i', $itemId);
-        executePrepared($stmt, 'Failed to permanently delete item');
-        $affectedRows = $stmt->affected_rows;
-        $stmt->close();
-
-        if ($affectedRows === 0) {
-            respondError('Item not found in trash.', 404);
-        }
-
-        respondSuccess();
-    },
     
-    // Get single item for editing
     'getMenuItem' => function ($conn, $body) {
         $itemId = (int)($_GET['itemId'] ?? 0);
         
@@ -148,9 +46,7 @@ $adminMenuInventoryActions = [
             SELECT m.itemID, m.name, m.price, m.stock, m.categoryID, m.image,
                    c.name as category_name
             FROM menu_items m
-            LEFT JOIN categories c
-                   ON c.categoryID = m.categoryID
-                  AND COALESCE(c.is_deleted, 0) = 0
+            LEFT JOIN categories c ON c.categoryID = m.categoryID
             WHERE m.itemID = ?
         ");
         $stmt->bind_param('i', $itemId);
@@ -174,7 +70,6 @@ $adminMenuInventoryActions = [
         ]);
     },
     
-    // Update item with image upload
     'updateMenuItem' => function ($conn, $body) {
         $itemId = (int)($body['itemId'] ?? 0);
         $name = trim($body['name'] ?? '');
@@ -257,6 +152,48 @@ $adminMenuInventoryActions = [
         respond([
             'success' => true,
             'message' => 'Item updated successfully'
+        ]);
+    },
+    
+    'deleteMenuItem' => function ($conn, $body) {
+        $itemId = (int)($body['itemId'] ?? 0);
+        
+        if ($itemId <= 0) {
+            respondError('Invalid item ID.');
+        }
+        
+        // Check if item exists in any orders
+        $check = $conn->prepare("SELECT COUNT(*) as count FROM orderitems WHERE ItemID = ?");
+        $check->bind_param('i', $itemId);
+        $check->execute();
+        $result = $check->get_result();
+        $row = $result->fetch_assoc();
+        $check->close();
+        
+        if ($row['count'] > 0) {
+            respondError('Cannot delete item that has been ordered. You can only update stock to 0.');
+        }
+        
+        // Delete image file if exists
+        $stmt = $conn->prepare("SELECT image FROM menu_items WHERE itemID = ?");
+        $stmt->bind_param('i', $itemId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $item = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($item && $item['image'] && file_exists('../' . $item['image'])) {
+            unlink('../' . $item['image']);
+        }
+        
+        $stmt = $conn->prepare("DELETE FROM menu_items WHERE itemID = ?");
+        $stmt->bind_param('i', $itemId);
+        executePrepared($stmt, 'Failed to delete item');
+        $stmt->close();
+        
+        respond([
+            'success' => true,
+            'message' => 'Item deleted successfully'
         ]);
     },
     
