@@ -14,7 +14,6 @@ $userCartActions = [
 
         $conn->begin_transaction();
         try {
-            // Check for existing cart order
             $stmt = $conn->prepare("SELECT OrderID FROM orders WHERE customerID = ? AND Status = 'In Cart' ORDER BY OrderID DESC LIMIT 1");
             $stmt->bind_param('i', $customerId);
             $stmt->execute();
@@ -23,14 +22,12 @@ $userCartActions = [
             $stmt->close();
 
             if ($cartOrder) {
-                // Clear existing cart items
                 $del = $conn->prepare("DELETE FROM orderitems WHERE OrderID = ?");
                 $del->bind_param('i', $cartOrder['OrderID']);
                 $del->execute();
                 $del->close();
                 $orderId = $cartOrder['OrderID'];
             } else {
-                // Create new cart order
                 $totalPayment = 0;
                 $stmt = $conn->prepare(
                     "INSERT INTO orders (Status, TotalPayment, customerID, order_date) VALUES ('In Cart', ?, ?, NOW())"
@@ -61,7 +58,6 @@ $userCartActions = [
                 $oi->close();
             }
 
-            // Update total payment
             $upd = $conn->prepare("UPDATE orders SET TotalPayment = ? WHERE OrderID = ?");
             $upd->bind_param('ii', $totalPayment, $orderId);
             $upd->execute();
@@ -84,7 +80,6 @@ $userCartActions = [
             respondError('Customer ID is required.');
         }
 
-        // Get cart order
         $stmt = $conn->prepare("SELECT OrderID FROM orders WHERE customerID = ? AND Status = 'In Cart' ORDER BY OrderID DESC LIMIT 1");
         $stmt->bind_param('i', $customerId);
         $stmt->execute();
@@ -96,7 +91,6 @@ $userCartActions = [
             respond(['cartItems' => [], 'orderID' => null]);
         }
 
-        // Get cart items
         $stmt = $conn->prepare(
             "SELECT oi.ItemID, oi.quantity, oi.price, mi.name, mi.stock
              FROM orderitems oi
@@ -127,44 +121,7 @@ $userCartActions = [
     'createOrder' => function ($conn, $body) {
         $customerId = (int)($body['customerId'] ?? 0);
         $totalPayment = (int)($body['totalPayment'] ?? 0);
-        $method = $body['method'] ?? '';
-        $reference = $body['reference'] ?? null;
-
-        if (!$customerId) {
-            respondError('Customer ID is required.');
-        }
-        if ($totalPayment <= 0) {
-            respondError('Invalid total payment.');
-        }
-        if (!in_array($method, ['cod', 'gcash', 'card'])) {
-            respondError('Invalid payment method.');
-        }
-        if ($method !== 'cod' && empty($reference)) {
-            respondError('Payment reference required for digital payments.');
-        }
-
-        // Validate/generate reference
-        if ($method === 'cod') {
-            $refNum = 'COD-' . strtoupper(substr(uniqid(), -6));
-        } else {
-            $refNum = preg_replace('/[^A-Za-z0-9]/', '', $reference);
-            if (strlen($refNum) < 6) {
-                respondError('Payment reference too short.');
-            }
-        }
-
-        respond([
-            'success' => true,
-            'message' => 'Payment confirmed',
-            'referenceNumber' => $refNum,
-            'method' => $method,
-            'totalPayment' => $totalPayment
-        ]);
-    },
-    'createOrder' => function ($conn, $body) {
-        $customerId   = (int)($body['customerId'] ?? 0);
-        $totalPayment = (int)($body['totalPayment'] ?? 0);
-        $cartItems    = $body['cartItems'] ?? [];
+        $cartItems = $body['cartItems'] ?? [];
 
         if (!$customerId) {
             respondError('Customer ID is required.');
@@ -178,7 +135,6 @@ $userCartActions = [
 
         $conn->begin_transaction();
         try {
-            // Check for existing cart order
             $stmt = $conn->prepare("SELECT OrderID FROM orders WHERE customerID = ? AND Status = 'In Cart' ORDER BY OrderID DESC LIMIT 1");
             $stmt->bind_param('i', $customerId);
             $stmt->execute();
@@ -187,16 +143,13 @@ $userCartActions = [
             $stmt->close();
 
             if ($cartOrder) {
-                // Use existing cart order, update status to Preparing
                 $orderId = $cartOrder['OrderID'];
-                
-                // Clear existing cart items
+
                 $del = $conn->prepare("DELETE FROM orderitems WHERE OrderID = ?");
                 $del->bind_param('i', $orderId);
                 $del->execute();
                 $del->close();
             } else {
-                // Create new order
                 $stmt = $conn->prepare(
                     "INSERT INTO orders (Status, TotalPayment, customerID, order_date) VALUES ('Preparing', ?, ?, NOW())"
                 );
@@ -208,8 +161,8 @@ $userCartActions = [
 
             foreach ($cartItems as $ci) {
                 $itemId = (int)$ci['itemID'];
-                $qty    = (int)$ci['quantity'];
-                $price  = (int)$ci['price'];
+                $qty = (int)$ci['quantity'];
+                $price = (int)$ci['price'];
 
                 if ($qty <= 0 || $price <= 0) {
                     throw new Exception('Invalid cart item data.');
@@ -240,7 +193,6 @@ $userCartActions = [
                 $upd->close();
             }
 
-            // Update order status to Preparing
             $upd = $conn->prepare("UPDATE orders SET Status = 'Preparing', TotalPayment = ? WHERE OrderID = ?");
             $upd->bind_param('ii', $totalPayment, $orderId);
             $upd->execute();
@@ -256,10 +208,10 @@ $userCartActions = [
 
             $conn->commit();
             respond([
-                'OrderID'         => $orderId,
+                'OrderID' => $orderId,
                 'referenceNumber' => $refNum,
-                'Status'          => 'Preparing',
-                'TotalPayment'    => $totalPayment,
+                'Status' => 'Preparing',
+                'TotalPayment' => $totalPayment,
             ]);
         } catch (Exception $e) {
             $conn->rollback();
@@ -267,4 +219,3 @@ $userCartActions = [
         }
     },
 ];
-
