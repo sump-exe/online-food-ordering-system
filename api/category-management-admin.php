@@ -203,6 +203,7 @@ $adminCategoryActions = [
         ]);
     },
     
+    // SOFT DELETE – with item check
     'deleteCategory' => function ($conn, $body) {
         $categoryId = (int)($body['categoryID'] ?? 0);
         
@@ -210,7 +211,7 @@ $adminCategoryActions = [
             respondError('Invalid category ID.');
         }
         
-        // First, get category info for response message
+        // First, get category info for response message and item count
         $stmt = $conn->prepare(
             "SELECT name, category_type
              FROM categories
@@ -226,6 +227,26 @@ $adminCategoryActions = [
             respondError('Category not found.');
         }
         
+        // Check for active menu items using this category
+        $checkItems = $conn->prepare(
+            "SELECT COUNT(*) AS cnt
+             FROM menu_items
+             WHERE categoryID = ? AND COALESCE(is_deleted, 0) = 0"
+        );
+        $checkItems->bind_param('i', $categoryId);
+        $checkItems->execute();
+        $res = $checkItems->get_result();
+        $itemCount = (int)($res->fetch_assoc()['cnt'] ?? 0);
+        $checkItems->close();
+        
+        if ($itemCount > 0) {
+            respondError(
+                "Cannot delete category '{$category['name']}' because it has {$itemCount} active menu item(s) assigned. " .
+                "Please reassign or delete those items first, then try again."
+            );
+        }
+        
+        // Proceed with soft delete
         $stmt = $conn->prepare(
             "UPDATE categories
              SET is_deleted = 1, deleted_at = NOW()
@@ -245,6 +266,8 @@ $adminCategoryActions = [
             respondError('Category not found or already deleted.');
         }
     },
+    
+    // Restore
     'restoreCategory' => function ($conn, $body) {
         $categoryId = (int)($body['categoryID'] ?? 0);
 
@@ -271,6 +294,8 @@ $adminCategoryActions = [
             'message' => 'Category restored successfully.'
         ]);
     },
+    
+    // Permanent delete (already has item check)
     'permanentlyDeleteCategory' => function ($conn, $body) {
         $categoryId = (int)($body['categoryID'] ?? 0);
 
@@ -330,7 +355,7 @@ $adminCategoryActions = [
         ]);
     },
     
-    // REASSIGN CATEGORY for menu items (optional utility function)
+    // REASSIGN CATEGORY for menu items
     'reassignMenuItems' => function ($conn, $body) {
         $oldCategoryId = (int)($body['oldCategoryId'] ?? 0);
         $newCategoryId = (int)($body['newCategoryId'] ?? 0);

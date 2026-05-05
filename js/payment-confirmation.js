@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { showReceipt, downloadReceiptPDF, printReceipt } from './payment-receipt.js';
 
 export function getCartSummaryHtml() {
     if (state.customerCart.length === 0) {
@@ -40,6 +41,81 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+// Show the classic post-payment modal
+function showPaymentSuccessModal(payment, renderApp) {
+    // Remove any existing modal first
+    const existingModal = document.getElementById('paymentSuccessModal');
+    if (existingModal) existingModal.remove();
+
+    const modalHtml = `
+    <div id="paymentSuccessModal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 500px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+                <h2 style="color: white;">✅ Order Confirmed</h2>
+                <button class="modal-close" id="closeSuccessModal" style="color: white;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                    <p><strong>Order ID:</strong> #${payment.order_id}</p>
+                    <p><strong>Receipt Number:</strong> ${payment.receipt_number}</p>
+                    <p><strong>Date & Time:</strong> ${formatDateTime(payment.transaction_datetime)}</p>
+                    <p><strong>Customer:</strong> ${escapeHtml(payment.customer_name)}</p>
+                    <p><strong>Payment Method:</strong> ${payment.payment_method}</p>
+                    <p><strong>Total Amount:</strong> P${Number(payment.total_amount || 0).toFixed(2)}</p>
+                    ${payment.change_amount > 0 ? `<p><strong>Change:</strong> P${Number(payment.change_amount || 0).toFixed(2)}</p>` : ''}
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: center; gap: 12px; flex-wrap: wrap;">
+                <button id="backHomeBtn" class="btn-success">🏠 Back to Home</button>
+                <button id="viewReceiptBtn" class="btn-primary">📄 View Receipt</button>
+                <button id="downloadReceiptBtn" class="btn-secondary">⬇️ Download PDF</button>
+                <button id="printReceiptBtn" class="btn-secondary">🖨️ Print</button>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const modal = document.getElementById('paymentSuccessModal');
+    const receiptNumber = payment.receipt_number;
+
+    // Event handlers
+    document.getElementById('closeSuccessModal').addEventListener('click', () => modal.remove());
+    document.getElementById('backHomeBtn').addEventListener('click', () => {
+        modal.remove();
+        renderApp();               // <-- stays logged in, returns to menu
+    });
+    document.getElementById('viewReceiptBtn').addEventListener('click', () => {
+        modal.remove();
+        showReceipt(receiptNumber);
+    });
+    document.getElementById('downloadReceiptBtn').addEventListener('click', () => {
+        downloadReceiptPDF(receiptNumber);
+    });
+    document.getElementById('printReceiptBtn').addEventListener('click', () => {
+        printReceipt(receiptNumber);
+    });
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+function formatDateTime(dateTimeStr) {
+    if (!dateTimeStr) return '-';
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
 }
 
 export function openPaymentConfirmationDrawer(renderInPlace, renderApp) {
@@ -108,14 +184,10 @@ export function openPaymentConfirmationDrawer(renderInPlace, renderApp) {
                 });
             });
 
-            msgDiv.innerHTML = `<div class="success-message" style="text-align:center;padding:20px;">
-                <div style="font-size:1.4rem;font-weight:800;color:#10b981;margin-bottom:8px;">Order #${result.order.OrderID} Confirmed!</div>
-                <div style="font-size:0.95rem;color:#6c757d;margin-bottom:12px;">Receipt ${result.payment.receipt_number} | Total: P${result.payment.total_amount.toFixed(2)}</div>
-            </div>`;
+            // Close drawer and show the classic success modal
+            closePayment();
+            showPaymentSuccessModal(result.payment, renderApp);
 
-            setTimeout(() => {
-                closePayment();
-            }, 2500);
         } catch (error) {
             msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
         }

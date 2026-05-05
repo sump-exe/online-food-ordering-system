@@ -15,7 +15,6 @@ export async function processPayment(orderId, totalAmount, paymentMethod, amount
 
         if (result.success) {
             currentReceiptData = result.payment;
-            showPaymentConfirmation(result.payment);
             return result.payment;
         }
     } catch (error) {
@@ -24,57 +23,6 @@ export async function processPayment(orderId, totalAmount, paymentMethod, amount
     }
 
     return null;
-}
-
-function showPaymentConfirmation(payment) {
-    const modalHtml = `
-    <div id="paymentConfirmationModal" class="modal-overlay">
-        <div class="modal-container" style="max-width: 500px;">
-            <div class="modal-header" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
-                <h2 style="color: white;">Payment Successful</h2>
-                <button class="modal-close" id="closePaymentModal" style="color: white;">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div style="background: #f0fdf4; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
-                    <p><strong>Order ID:</strong> #${payment.order_id}</p>
-                    <p><strong>Receipt Number:</strong> ${payment.receipt_number}</p>
-                    <p><strong>Date & Time:</strong> ${formatDateTime(payment.transaction_datetime)}</p>
-                    <p><strong>Customer:</strong> ${escapeHtml(payment.customer_name)}</p>
-                    <p><strong>Payment Method:</strong> ${payment.payment_method}</p>
-                    <p><strong>Total Amount:</strong> P${Number(payment.total_amount || 0).toFixed(2)}</p>
-                    ${payment.change_amount > 0 ? `<p><strong>Change:</strong> P${Number(payment.change_amount || 0).toFixed(2)}</p>` : ''}
-                </div>
-            </div>
-            <div class="modal-footer" style="justify-content: center; gap: 12px; flex-wrap: wrap;">
-                <button id="viewReceiptBtn" class="btn-primary">View Receipt</button>
-                <button id="downloadReceiptBtn" class="btn-secondary">Download Receipt (PDF)</button>
-                <button id="printPaymentReceiptBtn" class="btn-secondary">Print Receipt</button>
-                <button id="homeBtn" class="btn-success">Back to Home</button>
-            </div>
-        </div>
-    </div>`;
-
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    const modal = document.getElementById('paymentConfirmationModal');
-
-    document.getElementById('closePaymentModal').addEventListener('click', () => modal.remove());
-    document.getElementById('viewReceiptBtn').addEventListener('click', () => {
-        modal.remove();
-        showReceipt(payment.receipt_number);
-    });
-    document.getElementById('downloadReceiptBtn').addEventListener('click', () => downloadReceiptPDF(payment.receipt_number));
-    document.getElementById('printPaymentReceiptBtn').addEventListener('click', () => printReceipt(payment.receipt_number));
-    document.getElementById('homeBtn').addEventListener('click', () => {
-        modal.remove();
-        window.location.reload();
-    });
-
-    modal.addEventListener('click', (event) => {
-        if (event.target === modal) {
-            modal.remove();
-        }
-    });
 }
 
 export async function showReceipt(receiptNumber) {
@@ -179,7 +127,7 @@ function generateReceiptHTML(receipt) {
     </div>`;
 }
 
-async function downloadReceiptPDF(receiptNumber) {
+export async function downloadReceiptPDF(receiptNumber) {
     try {
         const result = await apiGet('getReceipt', { receipt_number: receiptNumber });
         const receipt = result.receipt;
@@ -214,7 +162,7 @@ async function downloadReceiptPDF(receiptNumber) {
     }
 }
 
-async function printReceipt(receiptNumber) {
+export async function printReceipt(receiptNumber) {
     try {
         const result = await apiGet('getReceipt', { receipt_number: receiptNumber });
         const receipt = result.receipt;
