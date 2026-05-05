@@ -60,6 +60,9 @@ $actionMap = [
     'getMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'getMenuItem'],
     'updateMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'updateMenuItem'],
     'deleteMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'deleteMenuItem'],
+    'restoreMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'restoreMenuItem'],
+    'permanentlyDeleteMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'permanentlyDeleteMenuItem'],
+    'getDeletedMenuItems' => ['group' => 'menu_inventory_admin', 'handler' => 'getDeletedMenuItems'],
     'updateStock' => ['group' => 'menu_inventory_admin', 'handler' => 'updateStock'],
     'updatePrice' => ['group' => 'menu_inventory_admin', 'handler' => 'updatePrice'],
 
@@ -85,6 +88,9 @@ $actionMap = [
     'addCategory' => ['group' => 'category_management_admin', 'handler' => 'addCategory'],
     'updateCategory' => ['group' => 'category_management_admin', 'handler' => 'updateCategory'],
     'deleteCategory' => ['group' => 'category_management_admin', 'handler' => 'deleteCategory'],
+    'restoreCategory' => ['group' => 'category_management_admin', 'handler' => 'restoreCategory'],
+    'permanentlyDeleteCategory' => ['group' => 'category_management_admin', 'handler' => 'permanentlyDeleteCategory'],
+    'getDeletedCategories' => ['group' => 'category_management_admin', 'handler' => 'getDeletedCategories'],
     'reassignMenuItems' => ['group' => 'category_management_admin', 'handler' => 'reassignMenuItems'],
     
     // Admin Tags Management
