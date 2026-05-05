@@ -6,6 +6,7 @@ require __DIR__ . '/api/cart-user.php';
 require __DIR__ . '/api/order-history-user.php';
 require __DIR__ . '/api/menu-user.php';
 require __DIR__ . '/api/menu-inventory-admin.php';
+require __DIR__ . '/api/payment-receipt.php';
 require __DIR__ . '/api/sales-report-admin.php';
 require __DIR__ . '/api/order-history-admin.php';
 require __DIR__ . '/api/users-management-admin.php';
@@ -18,6 +19,7 @@ $routes = [
     'order_history_user' => $userOrderHistoryActions,
     'menu_user' => $userMenuActions,
     'menu_inventory_admin' => $adminMenuInventoryActions,
+    'payment_receipt' => $paymentReceiptActions,
     'sales_report_admin' => $adminSalesReportActions,
     'order_history_admin' => $adminOrderHistoryActions,
     'users_management_admin' => $adminUsersManagementActions,
@@ -34,6 +36,8 @@ $actionMap = [
     'verifyResetToken' => ['group' => 'login', 'handler' => 'verifyResetToken'],
     
     // Cart & Orders
+    'saveCartToDb' => ['group' => 'cart_user', 'handler' => 'saveCartToDb'],
+    'loadCartFromDb' => ['group' => 'cart_user', 'handler' => 'loadCartFromDb'],
     'createOrder' => ['group' => 'cart_user', 'handler' => 'createOrder'],
     
     // Order History
@@ -58,6 +62,11 @@ $actionMap = [
     'deleteMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'deleteMenuItem'],
     'updateStock' => ['group' => 'menu_inventory_admin', 'handler' => 'updateStock'],
     'updatePrice' => ['group' => 'menu_inventory_admin', 'handler' => 'updatePrice'],
+
+    // Payments & Receipts
+    'processPayment' => ['group' => 'payment_receipt', 'handler' => 'processPayment'],
+    'getReceipt' => ['group' => 'payment_receipt', 'handler' => 'getReceipt'],
+    'getReceiptsByCustomer' => ['group' => 'payment_receipt', 'handler' => 'getReceiptsByCustomer'],
     
     // Admin Sales Reports
     'getSalesReport' => ['group' => 'sales_report_admin', 'handler' => 'getSalesReport'],

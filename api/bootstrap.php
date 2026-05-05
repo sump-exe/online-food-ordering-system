@@ -105,9 +105,9 @@ function verifyAndUpgradePassword($conn, $table, $idField, $account, $inputPassw
 
 function findAccount($conn, $table, $idField, $role, $username, $password) {
     $stmt = $conn->prepare(
-        "SELECT $idField AS id, username, password, ? AS role FROM $table WHERE username = ?"
+        "SELECT $idField AS id, username, password FROM $table WHERE username = ?"
     );
-    $stmt->bind_param('ss', $role, $username);
+    $stmt->bind_param('s', $username);
     $stmt->execute();
     $result = $stmt->get_result();
     $account = $result->fetch_assoc();
@@ -117,7 +117,7 @@ function findAccount($conn, $table, $idField, $role, $username, $password) {
         return [
             'id' => $account['id'],
             'username' => $account['username'],
-            'role' => $account['role'],
+            'role' => $role,
         ];
     }
     return null;
