@@ -95,7 +95,7 @@ export function renderTagsPage() {
 }
 
 function showEditTagModal(tag, onSave, onClose) {
-    removeModal();
+    removeEditTagModal();
     
     const modalHtml = `
     <div id="editTagModal" class="modal-overlay">
@@ -173,9 +173,14 @@ function showEditTagModal(tag, onSave, onClose) {
     nameInput.select();
 }
 
-function showDeleteConfirmModal(tagId, tagName, usageCount, onConfirm) {
+// RENAMED modal function with unique ID
+function showDeleteTagConfirmModal(tagId, tagName, usageCount, onConfirm) {
+    // Remove any existing tag delete modal first
+    const existing = document.getElementById('deleteTagConfirmModal');
+    if (existing) existing.remove();
+
     const modalHtml = `
-    <div id="deleteConfirmModal" class="modal-overlay">
+    <div id="deleteTagConfirmModal" class="modal-overlay">
         <div class="modal-container" style="max-width: 450px;">
             <div class="modal-header">
                 <h2>⚠️ Confirm Delete</h2>
@@ -200,7 +205,7 @@ function showDeleteConfirmModal(tagId, tagName, usageCount, onConfirm) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    const modal = document.getElementById('deleteConfirmModal');
+    const modal = document.getElementById('deleteTagConfirmModal');
     
     const closeModal = () => {
         modal.remove();
@@ -218,11 +223,9 @@ function showDeleteConfirmModal(tagId, tagName, usageCount, onConfirm) {
     });
 }
 
-function removeModal() {
+function removeEditTagModal() {
     const existingModal = document.getElementById('editTagModal');
     if (existingModal) existingModal.remove();
-    const deleteModal = document.getElementById('deleteConfirmModal');
-    if (deleteModal) deleteModal.remove();
 }
 
 function escapeHtml(str) {
@@ -326,7 +329,7 @@ export function attachTagsEvents(callbacks) {
             const tagName = deleteBtn.dataset.name;
             const usageCount = parseInt(deleteBtn.dataset.usage, 10);
             
-            showDeleteConfirmModal(tagId, tagName, usageCount, async () => {
+            showDeleteTagConfirmModal(tagId, tagName, usageCount, async () => {
                 try {
                     const result = await deleteTag(tagId);
                     if (refreshTags) await refreshTags();

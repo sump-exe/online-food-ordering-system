@@ -132,6 +132,110 @@ export function renderAdminCategoriesPage() {
     </div>`;
 }
 
+// =========== TRASH PAGE ===========
+export function renderAdminTrashPage() {
+    const categories = state.deletedAdminCategories || [];
+
+    if (categories.length === 0) {
+        return `
+        <div class="admin-page-content">
+            <div class="page-header">
+                <h1>Trash</h1>
+                <p>Deleted categories are shown here. You can restore or permanently delete them.</p>
+            </div>
+            <div class="empty-state" style="padding:80px 20px;">
+                <span class="empty-icon">🗑️</span>
+                <p>Trash is empty.</p>
+            </div>
+        </div>`;
+    }
+
+    // Split into two columns
+    const midPoint = Math.ceil(categories.length / 2);
+    const leftColumn = categories.slice(0, midPoint);
+    const rightColumn = categories.slice(midPoint);
+
+    const renderColumn = (items) => {
+        return items.map(cat => `
+            <div class="tag-card" style="flex-direction: column; align-items: flex-start;">
+                <div class="tag-content">
+                    <div class="tag-name-wrapper">
+                        <span class="tag-icon">🗂️</span>
+                        <span class="tag-name">${escapeHtml(cat.name)}</span>
+                    </div>
+                    <div style="font-size:0.8rem; color:#7a6070; margin-top:4px;">
+                        Type: ${cat.category_type} &nbsp;|&nbsp; Items: ${cat.item_count || 0} &nbsp;|&nbsp; Deleted: ${cat.deleted_at ? new Date(cat.deleted_at).toLocaleString() : '-'}
+                    </div>
+                </div>
+                <div class="tag-actions" style="margin-top:10px; width:100%; justify-content: flex-end;">
+                    <button class="restoreCategoryBtn btn-success small-btn" data-id="${cat.categoryID}" data-name="${escapeHtml(cat.name)}">
+                        ↺ Restore
+                    </button>
+                    <button class="permanentDeleteCategoryBtn btn-danger small-btn" data-id="${cat.categoryID}" data-name="${escapeHtml(cat.name)}" data-item-count="${cat.item_count}">
+                        ⚠️ Delete Forever
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    };
+
+    return `
+    <div class="admin-page-content">
+        <div class="page-header">
+            <h1>🗑️ Trash</h1>
+            <p>Deleted categories are shown here. You can restore or permanently delete them.</p>
+        </div>
+        <div class="panel">
+            <h2>Deleted Categories (${categories.length})</h2>
+            <div class="tags-two-columns">
+                <div class="tags-column">${renderColumn(leftColumn)}</div>
+                <div class="tags-column">${renderColumn(rightColumn)}</div>
+            </div>
+        </div>
+    </div>`;
+}
+
+export function attachTrashEvents(callbacks) {
+    const { renderApp, refreshTrash } = callbacks;
+
+    document.querySelectorAll('.restoreCategoryBtn').forEach(btn => {
+        btn.onclick = async () => {
+            const categoryId = parseInt(btn.dataset.id, 10);
+            try {
+                const result = await apiPost('restoreCategory', { categoryID: categoryId });
+                alert(result.message);
+                await refreshTrash();
+                await renderApp();
+            } catch (error) {
+                alert(error.message);
+            }
+        };
+    });
+
+    document.querySelectorAll('.permanentDeleteCategoryBtn').forEach(btn => {
+        btn.onclick = async () => {
+            const categoryId = parseInt(btn.dataset.id, 10);
+            const categoryName = btn.dataset.name;
+            const itemCount = parseInt(btn.dataset.itemCount, 10);
+            let message = `Permanently delete category "${categoryName}"?`;
+            if (itemCount > 0) {
+                message += `\n\n${itemCount} active menu item(s) will become uncategorized.`;
+            }
+            message += '\n\nThis cannot be undone.';
+            if (!confirm(message)) return;
+
+            try {
+                const result = await apiPost('permanentlyDeleteCategory', { categoryID: categoryId });
+                alert(result.message);
+                await refreshTrash();
+                await renderApp();
+            } catch (error) {
+                alert(error.message);
+            }
+        };
+    });
+}
+
 function showAddCategoryModal(onSave, onClose) {
     removeModal();
 
@@ -344,14 +448,6 @@ async function deleteCategory(categoryId) {
     return apiPost('deleteCategory', { categoryID: categoryId });
 }
 
-async function restoreCategory(categoryId) {
-    return apiPost('restoreCategory', { categoryID: categoryId });
-}
-
-async function permanentlyDeleteCategory(categoryId) {
-    return apiPost('permanentlyDeleteCategory', { categoryID: categoryId });
-}
-
 export function attachCategoryEvents(callbacks) {
     const { renderApp, refreshCategories, setAdminMessage } = callbacks;
 
@@ -399,50 +495,6 @@ export function attachCategoryEvents(callbacks) {
 
             try {
                 const result = await deleteCategory(categoryId);
-                if (refreshCategories) await refreshCategories();
-                if (renderApp) await renderApp();
-                if (setAdminMessage) {
-                    setAdminMessage(result.message, 'success');
-                }
-            } catch (error) {
-                alert(error.message);
-            }
-        };
-    });
-
-    document.querySelectorAll('.restoreCategoryBtn').forEach((btn) => {
-        btn.onclick = async () => {
-            try {
-                const result = await restoreCategory(parseInt(btn.dataset.id, 10));
-                if (refreshCategories) await refreshCategories();
-                if (renderApp) await renderApp();
-                if (setAdminMessage) {
-                    setAdminMessage(result.message, 'success');
-                }
-            } catch (error) {
-                alert(error.message);
-            }
-        };
-    });
-
-    document.querySelectorAll('.permanentDeleteCategoryBtn').forEach((btn) => {
-        btn.onclick = async () => {
-            const categoryId = parseInt(btn.dataset.id, 10);
-            const categoryName = btn.dataset.name;
-            const itemCount = parseInt(btn.dataset.itemCount, 10);
-
-            let message = `Permanently delete category "${categoryName}"?`;
-            if (itemCount > 0) {
-                message += `\n\n${itemCount} active menu item(s) will become Uncategorized.`;
-            }
-            message += '\n\nThis cannot be undone.';
-
-            if (!confirm(message)) {
-                return;
-            }
-
-            try {
-                const result = await permanentlyDeleteCategory(categoryId);
                 if (refreshCategories) await refreshCategories();
                 if (renderApp) await renderApp();
                 if (setAdminMessage) {

@@ -4,28 +4,34 @@ import {
     attachAdminMenuInventoryEvents,
     loadCategories as loadFoodCategories,
     loadMenuItems,
+    loadDeletedMenuItems,          // new
     renderAdminMenuPage,
     renderAdminNavBar,
+    renderDeletedMenuItemsSection, // new
+    attachTrashItemEvents,         // new
 } from './menu-inventory-admin.js';
 import { loadAdminSalesData, renderAdminSalesPage, attachSalesEvents } from './sales-report-admin.js';
 import { attachAdminOrderEvents, loadAdminOrders, renderAdminOrdersPage } from './order-history-admin.js';
 import { loadUsers, renderAdminUsersPage } from './users-management-admin.js';
 import { loadUserOrders } from './order-history-user.js';
 import { attachCustomerEvents, renderCustomerPage } from './menu-user.js';
-import { 
-    loadCategories as loadAdminCategories, 
-    renderAdminCategoriesPage, 
-    attachCategoryEvents 
+import {
+    loadCategories as loadAdminCategories,
+    renderAdminCategoriesPage,
+    attachCategoryEvents,
+    renderAdminTrashPage,
+    attachTrashEvents,
+    loadDeletedCategories,
 } from './category-management-admin.js';
-import { 
-    loadInventoryData, 
-    renderInventoryPage, 
-    attachInventoryEvents 
+import {
+    loadInventoryData,
+    renderInventoryPage,
+    attachInventoryEvents
 } from './stock-inventory.js';
-import { 
-    loadTags, 
-    renderTagsPage, 
-    attachTagsEvents 
+import {
+    loadTags,
+    renderTagsPage,
+    attachTagsEvents
 } from './tags-management.js';
 
 function getRoot() {
@@ -59,6 +65,9 @@ function renderAdminPageContent() {
     if (state.adminPage === 'users') {
         return renderAdminUsersPage();
     }
+    if (state.adminPage === 'trash') {
+        return renderAdminTrashPage() + renderDeletedMenuItemsSection();
+    }
     return renderAdminMenuPage();
 }
 
@@ -84,10 +93,10 @@ export function renderInPlace() {
     if (state.currentUser.role === 'admin') {
         root.innerHTML = renderAdminLayout();
         attachAdminMenuInventoryEvents({ renderApp, setAdminPage, logout });
-        
+
         if (state.adminPage === 'categories') {
-            attachCategoryEvents({ 
-                renderApp, 
+            attachCategoryEvents({
+                renderApp,
                 refreshCategories: async () => {
                     await loadAdminCategories();
                 },
@@ -96,7 +105,7 @@ export function renderInPlace() {
                 }
             });
         }
-        
+
         if (state.adminPage === 'tags') {
             attachTagsEvents({
                 renderApp,
@@ -105,11 +114,11 @@ export function renderInPlace() {
                 }
             });
         }
-        
+
         if (state.adminPage === 'orders') {
             attachAdminOrderEvents({ renderApp, renderInPlace });
         }
-        
+
         if (state.adminPage === 'sales') {
             attachSalesEvents({
                 renderApp,
@@ -118,12 +127,27 @@ export function renderInPlace() {
                 }
             });
         }
-        
+
         if (state.adminPage === 'inventory') {
             attachInventoryEvents({
                 renderApp,
                 refreshInventory: async () => {
                     await loadInventoryData();
+                }
+            });
+        }
+
+        if (state.adminPage === 'trash') {
+            attachTrashEvents({
+                renderApp,
+                refreshTrash: async () => {
+                    await loadDeletedCategories();
+                }
+            });
+            attachTrashItemEvents({
+                renderApp,
+                refreshDeletedItems: async () => {
+                    await loadDeletedMenuItems();
                 }
             });
         }
@@ -160,18 +184,19 @@ export async function renderApp() {
                 loadAdminSalesData(),
                 loadUsers(),
                 loadInventoryData(),
+                loadDeletedCategories(),
+                loadDeletedMenuItems(),   // load deleted items
             ]);
         } else {
             console.log('Loading customer data...');
             await Promise.all([
                 loadMenuItems(),
                 loadUserOrders(state.currentUser.userID),
-                loadFoodCategories(), // <-- ADDED: load categories for customer menu sidebar
+                loadFoodCategories(),
             ]);
         }
     } catch (error) {
         console.error('Customer data load warning:', error);
-        // Render anyway for customer - shows empty menu
         if (state.currentUser.role !== 'admin') {
             state.menuItems = [];
             state.orders = [];

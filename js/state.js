@@ -7,6 +7,8 @@ export const state = {
     menuItems: [],
     categories: [],
     adminCategories: [],
+    deletedAdminCategories: [],
+    deletedMenuItems: [],       // new
     tags: [],
     orders: [],
     users: [],
@@ -16,7 +18,7 @@ export const state = {
     currentResetUsername: null,
     isOrderHistoryOpen: false,
     isCartOpen: false,
-    customerMenuSearch: '', // <-- ADDED: needed for customer menu search
+    customerMenuSearch: '',
     salesFilter: {
         year: null,
         month: null,

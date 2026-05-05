@@ -11,6 +11,15 @@ export async function loadCategories() {
     state.categories = await apiGet('getCategories');
 }
 
+export async function loadDeletedMenuItems() {
+    try {
+        state.deletedMenuItems = await apiGet('getDeletedMenuItems');
+    } catch (error) {
+        console.error('Failed to load deleted menu items:', error);
+        state.deletedMenuItems = [];
+    }
+}
+
 export function renderAdminNavBar() {
     const navItems = [
         { id: 'menu', label: 'Menu & Inventory' },
@@ -20,6 +29,7 @@ export function renderAdminNavBar() {
         { id: 'sales', label: 'Sales Reports' },
         { id: 'inventory', label: 'Stock Inventory' },
         { id: 'users', label: 'Users' },
+        { id: 'trash', label: 'Trash' },
     ];
 
     const navLinksHtml = navItems.map((item) => `
@@ -182,28 +192,33 @@ function getEditModalHtml(categoryOptions) {
     </div>`;
 }
 
-function showDeleteConfirmModal(itemId, itemName, onConfirm) {
+// Updated modal with unique ID
+function showDeleteMenuItemConfirmModal(itemId, itemName, onConfirm) {
+    // Remove any existing delete menu item modal first
+    const existing = document.getElementById('deleteMenuItemConfirmModal');
+    if (existing) existing.remove();
+
     const modalHtml = `
-    <div id="deleteConfirmModal" class="modal-overlay">
+    <div id="deleteMenuItemConfirmModal" class="modal-overlay">
         <div class="modal-container" style="max-width: 400px;">
             <div class="modal-header">
                 <h2>Confirm Delete</h2>
                 <button class="modal-close" id="closeDeleteModalBtn">&times;</button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete <strong>${escapeHtml(itemName)}</strong>?</p>
-                <p style="color: #dc2626; font-size: 0.85rem;">This action cannot be undone.</p>
+                <p>Are you sure you want to move <strong>${escapeHtml(itemName)}</strong> to Trash?</p>
+                <p style="color: #dc2626; font-size: 0.85rem;">You can restore it later from the Trash.</p>
             </div>
             <div class="modal-footer">
                 <button id="cancelDeleteBtn" class="btn-secondary">Cancel</button>
-                <button id="confirmDeleteBtn" class="btn-danger">Delete Item</button>
+                <button id="confirmDeleteBtn" class="btn-danger">Move to Trash</button>
             </div>
         </div>
     </div>`;
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    const modal = document.getElementById('deleteConfirmModal');
+    const modal = document.getElementById('deleteMenuItemConfirmModal');
     
     const closeModal = () => {
         modal.remove();
@@ -339,12 +354,13 @@ export function attachAdminMenuInventoryEvents(callbacks) {
         if (deleteBtn) {
             const itemId = parseInt(deleteBtn.dataset.id, 10);
             const itemName = deleteBtn.dataset.name;
-            showDeleteConfirmModal(itemId, itemName, async () => {
+            // Use the renamed modal function
+            showDeleteMenuItemConfirmModal(itemId, itemName, async () => {
                 try {
                     await deleteMenuItem(itemId);
                     await renderApp();
                 } catch (error) {
-                    alert('Failed to delete item: ' + error.message);
+                    alert('Failed to move item to trash: ' + error.message);
                 }
             });
         }
@@ -446,4 +462,81 @@ export function attachAdminMenuInventoryEvents(callbacks) {
                 .catch((error) => alert(error.message));
         });
     }
+}
+
+// ========== TRASH – ITEMS ==========
+
+export function renderDeletedMenuItemsSection() {
+    const items = state.deletedMenuItems || [];
+    if (items.length === 0) {
+        return `
+        <div class="panel" style="margin-top:32px;">
+            <h2>🗑️ Deleted Menu Items</h2>
+            <p style="text-align:center; color:#aaa; padding:20px;">No deleted items.</p>
+        </div>`;
+    }
+
+    const rowsHtml = items.map(item => `
+        <tr>
+            <td><strong>${escapeHtml(item.name)}</strong></td>
+            <td>${item.category_name || '-'}</td>
+            <td>${item.deleted_at ? new Date(item.deleted_at).toLocaleString() : '-'}</td>
+            <td>
+                <button class="restoreItemBtn btn-success small-btn" data-id="${item.itemID}">↺ Restore</button>
+                <button class="permanentDeleteItemBtn btn-danger small-btn" data-id="${item.itemID}" data-name="${escapeHtml(item.name)}">⚠️ Delete Forever</button>
+            </td>
+        </tr>
+    `).join('');
+
+    return `
+    <div class="panel" style="margin-top:32px;">
+        <h2>🗑️ Deleted Menu Items</h2>
+        <div style="overflow-x:auto;">
+            <table class="menu-inventory-table" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th>Deleted At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+export function attachTrashItemEvents(callbacks) {
+    const { renderApp, refreshDeletedItems } = callbacks;
+
+    document.querySelectorAll('.restoreItemBtn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const itemId = parseInt(btn.dataset.id, 10);
+            try {
+                const result = await apiPost('restoreMenuItem', { itemId });
+                alert(result.message);
+                if (refreshDeletedItems) await refreshDeletedItems();
+                if (renderApp) await renderApp();
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+    });
+
+    document.querySelectorAll('.permanentDeleteItemBtn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const itemId = parseInt(btn.dataset.id, 10);
+            const itemName = btn.dataset.name;
+            if (!confirm(`Permanently delete "${itemName}"? This cannot be undone.`)) return;
+            try {
+                const result = await apiPost('permanentlyDeleteMenuItem', { itemId });
+                alert(result.message);
+                if (refreshDeletedItems) await refreshDeletedItems();
+                if (renderApp) await renderApp();
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+    });
 }
