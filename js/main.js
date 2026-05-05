@@ -162,19 +162,25 @@ export async function renderApp() {
                 loadInventoryData(),
             ]);
         } else {
+            console.log('Loading customer data...');
             await Promise.all([
                 loadMenuItems(),
                 loadUserOrders(state.currentUser.userID),
+                loadFoodCategories(), // <-- ADDED: load categories for customer menu sidebar
             ]);
         }
     } catch (error) {
-        console.error('Load error:', error);
-        root.innerHTML = `<div class="error-message" style="margin:40px auto;max-width:500px;">Failed to load data: ${error.message}</div>`;
-        return;
+        console.error('Customer data load warning:', error);
+        // Render anyway for customer - shows empty menu
+        if (state.currentUser.role !== 'admin') {
+            state.menuItems = [];
+            state.orders = [];
+        }
     }
 
     state.firstLoad = false;
     renderInPlace();
+    console.log('Customer UI rendered, menuItems:', state.menuItems.length);
 }
 
 export async function initializeApp() {

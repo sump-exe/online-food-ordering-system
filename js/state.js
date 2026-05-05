@@ -16,6 +16,7 @@ export const state = {
     currentResetUsername: null,
     isOrderHistoryOpen: false,
     isCartOpen: false,
+    customerMenuSearch: '', // <-- ADDED: needed for customer menu search
     salesFilter: {
         year: null,
         month: null,
