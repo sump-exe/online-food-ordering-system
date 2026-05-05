@@ -107,7 +107,7 @@ export function renderInPlace() {
         }
         
         if (state.adminPage === 'orders') {
-            attachAdminOrderEvents(renderApp);
+            attachAdminOrderEvents({ renderApp, renderInPlace });
         }
         
         if (state.adminPage === 'sales') {

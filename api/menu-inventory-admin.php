@@ -5,7 +5,10 @@ $adminMenuInventoryActions = [
         $name       = trim($body['name'] ?? '');
         $price      = (int)($body['price'] ?? 0);
         $stock      = (int)($body['stock'] ?? 0);
-        $categoryID = (int)($body['categoryID'] ?? 1);
+        $rawCategoryID = $body['categoryID'] ?? null;
+        $categoryID = is_numeric($rawCategoryID) && (int)$rawCategoryID > 0
+            ? (int)$rawCategoryID
+            : null;
 
         if (!$name) {
             respondError('Item name is required.');
@@ -17,10 +20,18 @@ $adminMenuInventoryActions = [
             respondError('Stock cannot be negative.');
         }
 
-        $stmt = $conn->prepare(
-            "INSERT INTO menu_items (name, price, stock, categoryID, timeToPrepare) VALUES (?, ?, ?, ?, NOW())"
-        );
-        $stmt->bind_param('siii', $name, $price, $stock, $categoryID);
+        if ($categoryID !== null) {
+            $stmt = $conn->prepare(
+                "INSERT INTO menu_items (name, price, stock, categoryID) VALUES (?, ?, ?, ?)"
+            );
+            $stmt->bind_param('siii', $name, $price, $stock, $categoryID);
+        } else {
+            $stmt = $conn->prepare(
+                "INSERT INTO menu_items (name, price, stock, categoryID) VALUES (?, ?, ?, NULL)"
+            );
+            $stmt->bind_param('sii', $name, $price, $stock);
+        }
+
         executePrepared($stmt, 'Failed to add item');
         $newId = $stmt->insert_id;
         $stmt->close();

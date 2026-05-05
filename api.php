@@ -64,6 +64,7 @@ $actionMap = [
     'getOrderStats' => ['group' => 'sales_report_admin', 'handler' => 'getOrderStats'],
     'getSalesByDate' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByDate'],
     'getSalesByCustomer' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByCustomer'],
+    'getMostOrderedItem' => ['group' => 'sales_report_admin', 'handler' => 'getMostOrderedItem'],
     
     // Admin Users Management
     'getUsers' => ['group' => 'users_management_admin', 'handler' => 'getUsers'],

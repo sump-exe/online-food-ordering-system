@@ -17,9 +17,22 @@ export const state = {
     isOrderHistoryOpen: false,
     isCartOpen: false,
     salesFilter: {
-        period: 'monthly',
-        startDate: null,
-        endDate: null
+        year: null,
+        month: null,
+        day: null,
+        username: null
+    },
+    allSalesData: {
+        salesByDate: [],
+        salesByCustomer: []
+    },
+    adminOrderFilter: {
+        user: '',
+        status: ''
+    },
+    mostOrderedItem: {
+        name: 'No data',
+        frequency: 0
     },
     salesReport: {
         totalSales: 0,

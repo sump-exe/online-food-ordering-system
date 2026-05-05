@@ -3,50 +3,139 @@ import { state } from './state.js';
 
 export async function loadAdminSalesData() {
     try {
-        const period = state.salesFilter?.period || 'monthly';
-        const startDate = state.salesFilter?.startDate || null;
-        const endDate = state.salesFilter?.endDate || null;
+        const year = state.salesFilter?.year || '';
+        const month = state.salesFilter?.month || '';
+        const day = state.salesFilter?.day || '';
+        const username = state.salesFilter?.username || '';
         
-        const params = { period };
-        if (startDate) params.startDate = startDate;
-        if (endDate) params.endDate = endDate;
+        // Build filter params - only include non-empty values
+        const filteredParams = {};
+        if (year) filteredParams.year = year;
+        if (month) filteredParams.month = month;
+        if (day) filteredParams.day = day;
+        if (username) filteredParams.username = username;
         
-        const [salesReport, orderStats, salesByDate, salesByCustomer] = await Promise.all([
-            apiGet('getSalesReport', params),
-            apiGet('getOrderStats'),
-            apiGet('getSalesByDate', params),
-            apiGet('getSalesByCustomer', params)
+        // Always load unfiltered data for filter options (only once or when filters reset)
+        if (!state.allSalesData.salesByDate || state.allSalesData.salesByDate.length === 0) {
+            const unfiltered = await Promise.all([
+                apiGet('getSalesByDate', {}).catch(err => {
+                    console.error('Error loading all sales data:', err);
+                    return [];
+                }),
+                apiGet('getSalesByCustomer', {}).catch(err => {
+                    console.error('Error loading all customers:', err);
+                    return [];
+                })
+            ]);
+            state.allSalesData.salesByDate = unfiltered[0] || [];
+            state.allSalesData.salesByCustomer = unfiltered[1] || [];
+        }
+        
+        // Load filtered data for display
+        const [salesByDate, salesByCustomer, mostOrderedItem] = await Promise.all([
+            apiGet('getSalesByDate', filteredParams).catch(err => {
+                console.error('Error loading filtered sales by date:', err);
+                return [];
+            }),
+            apiGet('getSalesByCustomer', filteredParams).catch(err => {
+                console.error('Error loading filtered sales by customer:', err);
+                return [];
+            }),
+            apiGet('getMostOrderedItem', filteredParams).catch(err => {
+                console.error('Error loading most ordered item:', err);
+                console.error('Params were:', filteredParams);
+                return { name: 'No data', frequency: 0 };
+            })
         ]);
         
-        state.salesReport = salesReport || { totalSales: 0, orderCount: 0 };
-        state.orderStats = orderStats || { Preparing: 0, Complete: 0, Cancelled: 0 };
         state.salesByDate = salesByDate || [];
         state.salesByCustomer = salesByCustomer || [];
+        state.mostOrderedItem = mostOrderedItem || { name: 'No data', frequency: 0 };
         
-        return { salesReport, orderStats, salesByDate, salesByCustomer };
+        return { salesByDate, salesByCustomer, mostOrderedItem };
     } catch (error) {
         console.error('Failed to load sales data:', error);
         state.salesByDate = [];
         state.salesByCustomer = [];
-        state.salesReport = { totalSales: 0, orderCount: 0 };
-        state.orderStats = { Preparing: 0, Complete: 0, Cancelled: 0 };
+        state.mostOrderedItem = { name: 'No data', frequency: 0 };
         return null;
     }
 }
 
-export function setSalesFilter(period, startDate = null, endDate = null) {
-    state.salesFilter = { period, startDate, endDate };
+export function setSalesFilter(year = null, month = null, day = null, username = null) {
+    state.salesFilter = { year, month, day, username };
+}
+
+function getUniqueYears() {
+    const years = state.allSalesData.salesByDate
+        .map(row => {
+            const date = row.sale_date;
+            if (date) {
+                const year = date.split('-')[0];
+                return year;
+            }
+            return null;
+        })
+        .filter(Boolean);
+    
+    return [...new Set(years)].sort((a, b) => b - a);
+}
+
+function getUniqueMonths() {
+    const months = state.allSalesData.salesByDate
+        .map(row => {
+            const date = row.sale_date;
+            if (date) {
+                const month = date.split('-')[1];
+                return month;
+            }
+            return null;
+        })
+        .filter(Boolean);
+    
+    return [...new Set(months)].sort((a, b) => a - b);
+}
+
+function getUniqueDays() {
+    const days = state.allSalesData.salesByDate
+        .map(row => {
+            const date = row.sale_date;
+            if (date) {
+                const day = date.split('-')[2];
+                return day;
+            }
+            return null;
+        })
+        .filter(Boolean);
+    
+    return [...new Set(days)].sort((a, b) => a - b);
+}
+
+function getUniqueUsernames() {
+    const usernames = (state.allSalesData.salesByCustomer || [])
+        .map(row => row.customer_name)
+        .filter(Boolean);
+    
+    return [...new Set(usernames)].sort((a, b) => a.localeCompare(b));
 }
 
 export function renderAdminSalesPage() {
     const salesByDate = state.salesByDate || [];
     const salesByCustomer = state.salesByCustomer || [];
-    const salesReport = state.salesReport || { totalSales: 0, orderCount: 0 };
-    const orderStats = state.orderStats || { Preparing: 0, Complete: 0, Cancelled: 0 };
+    const mostOrderedItem = state.mostOrderedItem || { name: 'No data', frequency: 0 };
     
     const totalRevenue = salesByDate.reduce((sum, row) => sum + (row.revenue || 0), 0);
     const totalOrderCount = salesByDate.reduce((sum, row) => sum + (row.order_count || 0), 0);
-    const currentPeriod = state.salesFilter?.period || 'monthly';
+    
+    const years = getUniqueYears();
+    const months = getUniqueMonths();
+    const days = getUniqueDays();
+    const usernames = getUniqueUsernames();
+    
+    const yearOptions = years.map(y => `<option value="${y}" ${state.salesFilter?.year === y ? 'selected' : ''}>${y}</option>`).join('');
+    const monthOptions = months.map(m => `<option value="${m}" ${state.salesFilter?.month === m ? 'selected' : ''}>${parseInt(m)}</option>`).join('');
+    const dayOptions = days.map(d => `<option value="${d}" ${state.salesFilter?.day === d ? 'selected' : ''}>${parseInt(d)}</option>`).join('');
+    const usernameOptions = usernames.map(u => `<option value="${u}" ${state.salesFilter?.username === u ? 'selected' : ''}>${u}</option>`).join('');
     
     const dateRows = salesByDate.map((row) => `
         <tr>
@@ -74,24 +163,32 @@ export function renderAdminSalesPage() {
         <div class="panel" style="margin-bottom: 24px;">
             <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label>Period</label>
-                    <select id="periodSelect">
-                        <option value="daily" ${currentPeriod === 'daily' ? 'selected' : ''}>Daily</option>
-                        <option value="weekly" ${currentPeriod === 'weekly' ? 'selected' : ''}>Weekly</option>
-                        <option value="monthly" ${currentPeriod === 'monthly' ? 'selected' : ''}>Monthly</option>
-                        <option value="yearly" ${currentPeriod === 'yearly' ? 'selected' : ''}>Yearly</option>
-                        <option value="custom" ${currentPeriod === 'custom' ? 'selected' : ''}>Custom Range</option>
+                    <label for="yearSelect">Year</label>
+                    <select id="yearSelect">
+                        <option value="">All Years</option>
+                        ${yearOptions}
                     </select>
                 </div>
-                <div id="customDateRange" style="display: ${currentPeriod === 'custom' ? 'flex' : 'none'}; gap: 12px;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label>From</label>
-                        <input type="date" id="startDate" value="${state.salesFilter?.startDate || ''}">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label>To</label>
-                        <input type="date" id="endDate" value="${state.salesFilter?.endDate || ''}">
-                    </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="monthSelect">Month</label>
+                    <select id="monthSelect">
+                        <option value="">All Months</option>
+                        ${monthOptions}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="daySelect">Day</label>
+                    <select id="daySelect">
+                        <option value="">All Days</option>
+                        ${dayOptions}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="usernameSelect">Username</label>
+                    <select id="usernameSelect">
+                        <option value="">All Users</option>
+                        ${usernameOptions}
+                    </select>
                 </div>
                 <button id="applyFilterBtn" class="btn-primary">Apply Filter</button>
                 <button id="resetFilterBtn" class="btn-secondary">Reset</button>
@@ -101,27 +198,21 @@ export function renderAdminSalesPage() {
         <div class="grid-3col" style="margin-bottom: 28px;">
             <div class="stat-card" style="--accent:#ff5722;">
                 <div class="stat-icon">💰</div>
-                <div class="stat-val">P${((salesReport.totalSales || totalRevenue) / 100).toFixed(2)}</div>
+                <div class="stat-val">P${(totalRevenue / 100).toFixed(2)}</div>
                 <div class="stat-label">Total Revenue</div>
-                <div class="stat-sub">From ${salesReport.orderCount || totalOrderCount} completed orders</div>
+                <div class="stat-sub">From ${totalOrderCount} completed orders</div>
             </div>
             <div class="stat-card" style="--accent:#10b981;">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-val">${mostOrderedItem.name}</div>
+                <div class="stat-label">Most Ordered Item</div>
+                <div class="stat-sub">Ordered ${mostOrderedItem.frequency} times</div>
+            </div>
+            <div class="stat-card" style="--accent:#3b82f6;">
                 <div class="stat-icon">📦</div>
-                <div class="stat-val">${orderStats.Complete || 0}</div>
-                <div class="stat-label">Completed Orders</div>
-                <div class="stat-sub">Successfully delivered</div>
-            </div>
-            <div class="stat-card" style="--accent:#f59e0b;">
-                <div class="stat-icon">⏳</div>
-                <div class="stat-val">${orderStats.Preparing || 0}</div>
-                <div class="stat-label">Preparing Orders</div>
-                <div class="stat-sub">In progress</div>
-            </div>
-            <div class="stat-card" style="--accent:#dc2626;">
-                <div class="stat-icon">❌</div>
-                <div class="stat-val">${orderStats.Cancelled || 0}</div>
-                <div class="stat-label">Cancelled Orders</div>
-                <div class="stat-sub">Cancelled by customers</div>
+                <div class="stat-val">${totalOrderCount}</div>
+                <div class="stat-label">Total Orders</div>
+                <div class="stat-sub">Completed orders</div>
             </div>
         </div>
         
@@ -158,36 +249,15 @@ export function renderAdminSalesPage() {
 export function attachSalesEvents(callbacks) {
     const { renderApp, loadSalesData } = callbacks;
     
-    const periodSelect = document.getElementById('periodSelect');
-    const customDateRange = document.getElementById('customDateRange');
-    
-    if (periodSelect) {
-        periodSelect.addEventListener('change', () => {
-            const isCustom = periodSelect.value === 'custom';
-            if (customDateRange) {
-                customDateRange.style.display = isCustom ? 'flex' : 'none';
-            }
-        });
-    }
-    
     const applyBtn = document.getElementById('applyFilterBtn');
     if (applyBtn) {
         applyBtn.addEventListener('click', async () => {
-            const period = periodSelect ? periodSelect.value : 'monthly';
-            let startDate = null;
-            let endDate = null;
+            const year = document.getElementById('yearSelect')?.value || null;
+            const month = document.getElementById('monthSelect')?.value || null;
+            const day = document.getElementById('daySelect')?.value || null;
+            const username = document.getElementById('usernameSelect')?.value || null;
             
-            if (period === 'custom') {
-                startDate = document.getElementById('startDate')?.value || null;
-                endDate = document.getElementById('endDate')?.value || null;
-                
-                if (!startDate || !endDate) {
-                    alert('Please select both start and end dates');
-                    return;
-                }
-            }
-            
-            setSalesFilter(period, startDate, endDate);
+            setSalesFilter(year, month, day, username);
             if (loadSalesData) await loadSalesData();
             if (renderApp) await renderApp();
         });
@@ -196,7 +266,7 @@ export function attachSalesEvents(callbacks) {
     const resetBtn = document.getElementById('resetFilterBtn');
     if (resetBtn) {
         resetBtn.addEventListener('click', async () => {
-            setSalesFilter('monthly', null, null);
+            setSalesFilter(null, null, null, null);
             if (loadSalesData) await loadSalesData();
             if (renderApp) await renderApp();
         });
