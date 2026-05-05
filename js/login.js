@@ -209,7 +209,7 @@ function closeForgotPasswordModal() {
     }
 }
 
-function showForgotPasswordDialog() {
+function showForgotPasswordDialog(renderInPlace) {
     closeForgotPasswordModal();
 
     const modalHtml = `
