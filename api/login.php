@@ -44,7 +44,7 @@ $loginActions = [
             'role'     => $account['role'],
         ]]);
     },
-'register' => function ($conn, $body) {
+    'register' => function ($conn, $body) {
         $username = trim($body['username'] ?? '');
         $password = $body['password'] ?? '';
         $email = trim($body['email'] ?? '');
@@ -160,7 +160,7 @@ $loginActions = [
             'message' => 'Email verified! Registration complete. Please login.',
         ]);
     },
-'forgotPassword' => function ($conn, $body) {
+    'forgotPassword' => function ($conn, $body) {
         $username = $body['username'] ?? '';
 
         if (!$username) {
@@ -195,7 +195,7 @@ $loginActions = [
             respondError('No email address found for this user. Please contact support.');
         }
 
-// Generate 6-digit OTP
+        // Generate 6-digit OTP
         $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         // Delete any existing unused password_reset OTPs for this username
@@ -220,7 +220,7 @@ $loginActions = [
             'email' => maskEmail($email),
         ]);
     },
-'verifyOTP' => function ($conn, $body) {
+    'verifyOTP' => function ($conn, $body) {
         $username = $body['username'] ?? '';
         $otp = normalizeOtpInput($body['otp'] ?? '');
         $email = $body['email'] ?? ''; // Optional: allow email for verification
@@ -322,7 +322,7 @@ $loginActions = [
         // Generate new 6-digit OTP
         $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-// Delete any existing unused password_reset OTPs for this username
+        // Delete any existing unused password_reset OTPs for this username
         $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND used = 0 AND (type = 'password_reset' OR type IS NULL OR type = '')");
         $stmt->bind_param('s', $username);
         $stmt->execute();
@@ -344,7 +344,7 @@ $loginActions = [
             'email' => maskEmail($email),
         ]);
     },
-'resetPassword' => function ($conn, $body) {
+    'resetPassword' => function ($conn, $body) {
         $otp = normalizeOtpInput($body['otp'] ?? '');
         $username = $body['username'] ?? '';
         $email = $body['email'] ?? ''; // Optional email for verification
@@ -363,7 +363,7 @@ $loginActions = [
 
         validatePassword($newPassword);
 
-// Check if password_reset OTP was verified (used = 1)
+        // Check if password_reset OTP was verified (used = 1)
         $stmt = $conn->prepare("
             SELECT id, email 
             FROM password_otps 
@@ -452,13 +452,57 @@ $loginActions = [
             'phone_number' => $account['phone_number'] ?? '',
         ]);
     },
-'updateAccountSettings' => function ($conn, $body) {
+    'sendPasswordChangeOtp' => function ($conn, $body) {
+        $customerId = (int)($body['customerId'] ?? 0);
+        if ($customerId <= 0) respondError('Customer ID required.');
+        $stmt = $conn->prepare("SELECT username, email FROM customers WHERE customerID = ?");
+        $stmt->bind_param('i', $customerId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $customer = $result->fetch_assoc();
+        $stmt->close();
+        if (!$customer || empty($customer['email'])) respondError('No email on file.');
+
+        $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        // Delete previous unused password_change OTPs for this user
+        $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND type = 'password_change' AND used = 0");
+        $stmt->bind_param('s', $customer['username']);
+        $stmt->execute();
+        $stmt->close();
+        createOtpRecord($conn, $customer['username'], $customer['email'], $otp, 'password_change');
+        $emailResult = sendOTPEmail($customer['email'], $otp, $customer['username']);
+        if (!$emailResult['success']) respondError('Failed to send OTP: ' . $emailResult['message']);
+        respond(['success' => true, 'message' => 'OTP sent to your email.', 'email' => maskEmail($customer['email'])]);
+    },
+    'sendAccountDeletionOtp' => function ($conn, $body) {
+        $customerId = (int)($body['customerId'] ?? 0);
+        if ($customerId <= 0) respondError('Customer ID required.');
+        $stmt = $conn->prepare("SELECT username, email FROM customers WHERE customerID = ?");
+        $stmt->bind_param('i', $customerId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $customer = $result->fetch_assoc();
+        $stmt->close();
+        if (!$customer || empty($customer['email'])) respondError('No email on file.');
+
+        $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $stmt = $conn->prepare("DELETE FROM password_otps WHERE username = ? AND type = 'account_deletion' AND used = 0");
+        $stmt->bind_param('s', $customer['username']);
+        $stmt->execute();
+        $stmt->close();
+        createOtpRecord($conn, $customer['username'], $customer['email'], $otp, 'account_deletion');
+        $emailResult = sendOTPEmail($customer['email'], $otp, $customer['username']);
+        if (!$emailResult['success']) respondError('Failed to send OTP: ' . $emailResult['message']);
+        respond(['success' => true, 'message' => 'OTP sent to your email.', 'email' => maskEmail($customer['email'])]);
+    },
+    'updateAccountSettings' => function ($conn, $body) {
         $customerId = (int)($body['customerId'] ?? 0);
         $email = trim((string)($body['email'] ?? ''));
         $phoneNumber = trim((string)($body['phoneNumber'] ?? ''));
         $currentPassword = $body['currentPassword'] ?? '';
         $newPassword = $body['newPassword'] ?? '';
         $confirmPassword = $body['confirmPassword'] ?? '';
+        $otp = $body['otp'] ?? '';
 
         if ($customerId <= 0) {
             respondError('Customer ID is required.');
@@ -497,6 +541,23 @@ $loginActions = [
             if ($newPassword !== $confirmPassword) {
                 respondError('New passwords do not match.');
             }
+
+            // --- OTP verification for password change ---
+            if (empty($otp)) {
+                respondError('OTP is required for password change. Please request one first.');
+            }
+            $otpStmt = $conn->prepare("SELECT id FROM password_otps WHERE username = ? AND otp = ? AND type = 'password_change' AND used = 0 AND expires_at > NOW() LIMIT 1");
+            $otpStmt->bind_param('ss', $username, $otp);
+            $otpStmt->execute();
+            $otpResult = $otpStmt->get_result();
+            $otpRecord = $otpResult->fetch_assoc();
+            $otpStmt->close();
+            if (!$otpRecord) {
+                respondError('Invalid or expired OTP. Please request a new one.');
+            }
+            // Mark OTP as used
+            $conn->query("UPDATE password_otps SET used = 1 WHERE id = " . (int)$otpRecord['id']);
+            // -------------------------------------------
 
             validatePassword($newPassword);
             $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
@@ -544,6 +605,7 @@ $loginActions = [
     'deleteAccount' => function ($conn, $body) {
         $customerId = (int)($body['customerId'] ?? 0);
         $password = $body['password'] ?? '';
+        $otp = $body['otp'] ?? '';
 
         if ($customerId <= 0) {
             respondError('Customer ID is required.');
@@ -566,6 +628,22 @@ $loginActions = [
         if (!password_verify($password, $account['password'])) {
             respondError('Incorrect password.');
         }
+
+        // --- OTP verification for account deletion ---
+        if (empty($otp)) {
+            respondError('OTP is required for account deletion. Please request one first.');
+        }
+        $otpStmt = $conn->prepare("SELECT id FROM password_otps WHERE username = ? AND otp = ? AND type = 'account_deletion' AND used = 0 AND expires_at > NOW() LIMIT 1");
+        $otpStmt->bind_param('ss', $account['username'], $otp);
+        $otpStmt->execute();
+        $otpResult = $otpStmt->get_result();
+        $otpRecord = $otpResult->fetch_assoc();
+        $otpStmt->close();
+        if (!$otpRecord) {
+            respondError('Invalid or expired OTP. Please request a new one.');
+        }
+        $conn->query("UPDATE password_otps SET used = 1 WHERE id = " . (int)$otpRecord['id']);
+        // -------------------------------------------
 
         $conn->begin_transaction();
         try {

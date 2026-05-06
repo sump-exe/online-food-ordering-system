@@ -32,14 +32,20 @@ $actionMap = [
     'login' => ['group' => 'login', 'handler' => 'login'],
     'register' => ['group' => 'login', 'handler' => 'register'],
     'forgotPassword' => ['group' => 'login', 'handler' => 'forgotPassword'],
+    'verifyOTP' => ['group' => 'login', 'handler' => 'verifyOTP'],
     'resetPassword' => ['group' => 'login', 'handler' => 'resetPassword'],
     'verifyResetToken' => ['group' => 'login', 'handler' => 'verifyResetToken'],
-    
+    'getAccountSettings' => ['group' => 'login', 'handler' => 'getAccountSettings'],
+    'updateAccountSettings' => ['group' => 'login', 'handler' => 'updateAccountSettings'],
+    'deleteAccount' => ['group' => 'login', 'handler' => 'deleteAccount'],
+    'sendPasswordChangeOtp' => ['group' => 'login', 'handler' => 'sendPasswordChangeOtp'],
+    'sendAccountDeletionOtp' => ['group' => 'login', 'handler' => 'sendAccountDeletionOtp'],
+
     // Cart & Orders
     'saveCartToDb' => ['group' => 'cart_user', 'handler' => 'saveCartToDb'],
     'loadCartFromDb' => ['group' => 'cart_user', 'handler' => 'loadCartFromDb'],
     'createOrder' => ['group' => 'cart_user', 'handler' => 'createOrder'],
-    
+
     // Order History
     'getOrders' => [
         'group' => isset($_GET['customerId']) ? 'order_history_user' : 'order_history_admin',
@@ -50,11 +56,11 @@ $actionMap = [
         'handler' => (($body['status'] ?? '') === 'Cancelled') ? 'updateOrderStatus' : 'updateOrderStatusAdmin',
     ],
     'getOrderDetails' => ['group' => 'order_history_admin', 'handler' => 'getOrderDetails'],
-    
+
     // Menu (User)
     'getMenuItems' => ['group' => 'menu_user', 'handler' => 'getMenuItems'],
     'getCategories' => ['group' => 'menu_user', 'handler' => 'getCategories'],
-    
+
     // Admin Menu & Inventory
     'addMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'addMenuItem'],
     'getMenuItem' => ['group' => 'menu_inventory_admin', 'handler' => 'getMenuItem'],
@@ -70,17 +76,17 @@ $actionMap = [
     'processPayment' => ['group' => 'payment_receipt', 'handler' => 'processPayment'],
     'getReceipt' => ['group' => 'payment_receipt', 'handler' => 'getReceipt'],
     'getReceiptsByCustomer' => ['group' => 'payment_receipt', 'handler' => 'getReceiptsByCustomer'],
-    
+
     // Admin Sales Reports
     'getSalesReport' => ['group' => 'sales_report_admin', 'handler' => 'getSalesReport'],
     'getOrderStats' => ['group' => 'sales_report_admin', 'handler' => 'getOrderStats'],
     'getSalesByDate' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByDate'],
     'getSalesByCustomer' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByCustomer'],
     'getMostOrderedItem' => ['group' => 'sales_report_admin', 'handler' => 'getMostOrderedItem'],
-    
+
     // Admin Users Management
     'getUsers' => ['group' => 'users_management_admin', 'handler' => 'getUsers'],
-    
+
     // Admin Category Management
     'getAdminCategories' => ['group' => 'category_management_admin', 'handler' => 'getCategories'],
     'getCategoriesByType' => ['group' => 'category_management_admin', 'handler' => 'getCategoriesByType'],
@@ -92,7 +98,7 @@ $actionMap = [
     'permanentlyDeleteCategory' => ['group' => 'category_management_admin', 'handler' => 'permanentlyDeleteCategory'],
     'getDeletedCategories' => ['group' => 'category_management_admin', 'handler' => 'getDeletedCategories'],
     'reassignMenuItems' => ['group' => 'category_management_admin', 'handler' => 'reassignMenuItems'],
-    
+
     // Admin Tags Management
     'getTags' => ['group' => 'tags_management_admin', 'handler' => 'getTags'],
     'addTag' => ['group' => 'tags_management_admin', 'handler' => 'addTag'],

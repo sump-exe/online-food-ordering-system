@@ -412,7 +412,6 @@ function openCartDrawer(renderInPlace, renderApp) {
     }
 }
 
-
 function openOrderHistoryDrawer(renderInPlace, renderApp) {
     const existingDrawer = document.getElementById('orderHistoryDrawer');
     const existingOverlay = document.getElementById('orderHistoryOverlay');
@@ -528,12 +527,39 @@ async function openAccountSettingsDrawer(renderInPlace) {
                     <label>Confirm New Password</label>
                     <input type="password" id="accountConfirmPassword" placeholder="Confirm new password">
                 </div>
+                <div class="form-group" id="otpGroupPassword" style="display:none;">
+                    <label>OTP (Sent to your email)</label>
+                    <input type="text" id="accountOtpPassword" placeholder="Enter 6-digit OTP" maxlength="6" style="text-align:center;letter-spacing:8px;font-size:18px;">
+                </div>
+                <button type="button" class="btn-secondary" id="sendPasswordOtpBtn" style="width:100%;padding:12px;margin-bottom:12px;">
+                    Send OTP to Change Password
+                </button>
+                <small id="passwordOtpMessage" style="color:#10b981;display:block;margin-bottom:8px;"></small>
             </div>
             <button class="btn-primary" id="saveAccountSettingsBtn" style="width:100%;padding:14px;">Save Changes</button>
             <div style="margin-top:24px;padding-top:18px;border-top:2px solid #ffe0c4;">
                 <div style="font-weight:700;color:#dc2626;margin-bottom:12px;">Danger Zone</div>
                 <p style="color:#666;font-size:0.9rem;margin-bottom:12px;">Once you delete your account, there is no going back. Please be certain.</p>
-                <button class="btn-danger" id="deleteAccountBtn" style="width:100%;padding:14px;background:#dc2626;color:#fff;border:none;border-radius:8px;cursor:pointer;">Delete My Account</button>
+                <div id="deleteAccountSection">
+                    <button class="btn-danger" id="initiateDeleteBtn" style="width:100%;padding:14px;background:#dc2626;color:#fff;border:none;border-radius:8px;cursor:pointer;">
+                        Delete My Account
+                    </button>
+                    <div id="deleteConfirmationForm" style="display:none;margin-top:12px;">
+                        <div class="form-group">
+                            <label>Current Password</label>
+                            <input type="password" id="deletePassword" placeholder="Enter your password">
+                        </div>
+                        <div class="form-group" id="otpGroupDelete" style="display:none;">
+                            <label>OTP (Sent to your email)</label>
+                            <input type="text" id="accountOtpDelete" placeholder="Enter 6-digit OTP" maxlength="6" style="text-align:center;letter-spacing:8px;font-size:18px;">
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button type="button" class="btn-secondary" id="sendDeleteOtpBtn" style="flex:1;padding:10px;">Send OTP</button>
+                            <button type="button" class="btn-danger" id="confirmDeleteBtn" style="flex:1;padding:10px;background:#dc2626;color:#fff;border:none;border-radius:8px;">Confirm Deletion</button>
+                        </div>
+                        <small id="deleteOtpMessage" style="color:#10b981;display:block;margin-top:8px;"></small>
+                    </div>
+                </div>
             </div>
         </div>
     </aside>`;
@@ -548,8 +574,37 @@ async function openAccountSettingsDrawer(renderInPlace) {
     document.getElementById('closeAccountSettingsBtn')?.addEventListener('click', closeDrawer);
     document.getElementById('accountSettingsOverlay')?.addEventListener('click', closeDrawer);
 
+    const msgDiv = document.getElementById('accountSettingsMessage');
+    const otpGroupPassword = document.getElementById('otpGroupPassword');
+    const passwordOtpMsg = document.getElementById('passwordOtpMessage');
+
+    // --- Send OTP for password change ---
+    document.getElementById('sendPasswordOtpBtn')?.addEventListener('click', async () => {
+        const currentPwd = document.getElementById('accountCurrentPassword').value;
+        const newPwd = document.getElementById('accountNewPassword').value;
+        const confirmPwd = document.getElementById('accountConfirmPassword').value;
+
+        if (!currentPwd || !newPwd || !confirmPwd) {
+            msgDiv.innerHTML = '<div class="error-message">Please fill all password fields before requesting OTP.</div>';
+            return;
+        }
+        if (newPwd !== confirmPwd) {
+            msgDiv.innerHTML = '<div class="error-message">New passwords do not match.</div>';
+            return;
+        }
+
+        try {
+            const result = await apiPost('sendPasswordChangeOtp', { customerId: state.currentUser.userID });
+            passwordOtpMsg.textContent = `OTP sent to ${result.email}. Check your inbox.`;
+            otpGroupPassword.style.display = 'block';
+        } catch (error) {
+            msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        }
+    });
+
+    // --- Save changes ---
     document.getElementById('saveAccountSettingsBtn')?.addEventListener('click', async () => {
-        const msgDiv = document.getElementById('accountSettingsMessage');
+        msgDiv.innerHTML = '';
         const payload = {
             customerId: state.currentUser.userID,
             email: document.getElementById('accountEmail')?.value.trim() || '',
@@ -558,6 +613,16 @@ async function openAccountSettingsDrawer(renderInPlace) {
             newPassword: document.getElementById('accountNewPassword')?.value || '',
             confirmPassword: document.getElementById('accountConfirmPassword')?.value || '',
         };
+
+        // If new password is being changed, require OTP
+        if (payload.newPassword) {
+            const otp = document.getElementById('accountOtpPassword')?.value.trim();
+            if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
+                msgDiv.innerHTML = '<div class="error-message">Please enter a valid 6-digit OTP.</div>';
+                return;
+            }
+            payload.otp = otp;
+        }
 
         try {
             const result = await saveAccountSettings(payload);
@@ -572,20 +637,55 @@ async function openAccountSettingsDrawer(renderInPlace) {
         }
     });
 
-    document.getElementById('deleteAccountBtn')?.addEventListener('click', async () => {
-        const password = prompt('Please enter your password to confirm account deletion:');
+    // --- Account deletion flow ---
+    const deleteSection = document.getElementById('deleteAccountSection');
+    const initiateBtn = document.getElementById('initiateDeleteBtn');
+    const confirmForm = document.getElementById('deleteConfirmationForm');
+    const sendDeleteOtpBtn = document.getElementById('sendDeleteOtpBtn');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    const deleteOtpMsg = document.getElementById('deleteOtpMessage');
+    const otpGroupDelete = document.getElementById('otpGroupDelete');
+
+    initiateBtn?.addEventListener('click', () => {
+        initiateBtn.style.display = 'none';
+        confirmForm.style.display = 'block';
+        msgDiv.innerHTML = '';
+        deleteOtpMsg.textContent = '';
+        otpGroupDelete.style.display = 'none';
+        document.getElementById('deletePassword').value = '';
+        document.getElementById('accountOtpDelete').value = '';
+    });
+
+    sendDeleteOtpBtn?.addEventListener('click', async () => {
+        const password = document.getElementById('deletePassword').value;
         if (!password) {
+            msgDiv.innerHTML = '<div class="error-message">Please enter your current password first.</div>';
             return;
         }
+        try {
+            const result = await apiPost('sendAccountDeletionOtp', { customerId: state.currentUser.userID });
+            deleteOtpMsg.textContent = `OTP sent to ${result.email}. Check your inbox.`;
+            otpGroupDelete.style.display = 'block';
+        } catch (error) {
+            msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        }
+    });
 
-        if (!confirm('Are you absolutely sure you want to delete your account? This action cannot be undone.')) {
+    confirmDeleteBtn?.addEventListener('click', async () => {
+        const password = document.getElementById('deletePassword').value;
+        const otp = document.getElementById('accountOtpDelete')?.value.trim();
+
+        if (!password) {
+            msgDiv.innerHTML = '<div class="error-message">Please enter your current password.</div>';
             return;
         }
-
-        const msgDiv = document.getElementById('accountSettingsMessage');
+        if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
+            msgDiv.innerHTML = '<div class="error-message">Please enter a valid 6-digit OTP.</div>';
+            return;
+        }
 
         try {
-            await deleteAccount(state.currentUser.userID, password);
+            await deleteAccount(state.currentUser.userID, password, otp);
             alert('Your account has been deleted successfully.');
             state.currentUser = null;
             state.customerCart = [];
