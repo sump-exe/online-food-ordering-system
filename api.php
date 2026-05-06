@@ -31,8 +31,10 @@ $actionMap = [
     // Login & Authentication
     'login' => ['group' => 'login', 'handler' => 'login'],
     'register' => ['group' => 'login', 'handler' => 'register'],
+    'verifyRegistration' => ['group' => 'login', 'handler' => 'verifyRegistration'],
     'forgotPassword' => ['group' => 'login', 'handler' => 'forgotPassword'],
     'verifyOTP' => ['group' => 'login', 'handler' => 'verifyOTP'],
+    'resendOTP' => ['group' => 'login', 'handler' => 'resendOTP'],
     'resetPassword' => ['group' => 'login', 'handler' => 'resetPassword'],
     'verifyResetToken' => ['group' => 'login', 'handler' => 'verifyResetToken'],
     'getAccountSettings' => ['group' => 'login', 'handler' => 'getAccountSettings'],

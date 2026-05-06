@@ -2,7 +2,7 @@ import { apiGet, apiPost } from './api.js';
 import { state } from './state.js';
 import { addToCart, getCartTotal, placeOrder, removeFromCart, updateQuantity } from './cart-user.js';
 import { cancelOrder, renderUserOrdersRows } from './order-history-user.js';
-import { deleteAccount } from './login.js';
+// deleteAccount from login.js is NOT imported because we use apiPost directly here
 
 export async function loadUserMenuData(loadMenuItems, loadUserOrders) {
     await Promise.all([loadMenuItems(), loadUserOrders(state.currentUser.userID)]);
@@ -685,7 +685,13 @@ async function openAccountSettingsDrawer(renderInPlace) {
         }
 
         try {
-            await deleteAccount(state.currentUser.userID, password, otp);
+            // Direct API call (does not depend on login.js)
+            await apiPost('deleteAccount', {
+                customerId: state.currentUser.userID,
+                password: password,
+                otp: otp,
+            });
+
             alert('Your account has been deleted successfully.');
             state.currentUser = null;
             state.customerCart = [];
