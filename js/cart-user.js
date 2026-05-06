@@ -266,11 +266,11 @@ export async function loadCartFromDb() {
     }
 }
 
+// NOTE: renderApp is intentionally NOT called here.
+// The caller (payment-confirmation.js) is responsible for showing the
+// success modal first and only calling renderApp when the user dismisses it.
 export async function confirmPayment(options = {}) {
-    const { paymentMethod = 'Cash', amountPaid = null, renderApp = null } = options;
+    const { paymentMethod = 'Cash', amountPaid = null } = options;
     const result = await createOrderAndProcessPayment({ paymentMethod, amountPaid });
-    if (typeof renderApp === 'function') {
-        await renderApp();
-    }
     return result;
 }
