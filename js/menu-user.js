@@ -557,7 +557,7 @@ async function openAccountSettingsDrawer(renderInPlace) {
                             <button type="button" class="btn-secondary" id="sendDeleteOtpBtn" style="flex:1;padding:10px;">Send OTP</button>
                             <button type="button" class="btn-danger" id="confirmDeleteBtn" style="flex:1;padding:10px;background:#dc2626;color:#fff;border:none;border-radius:8px;">Confirm Deletion</button>
                         </div>
-                        <small id="deleteOtpMessage" style="color:#10b981;display:block;margin-top:8px;"></small>
+                        <small id="deleteOtpMessage" style="display:block;margin-top:8px;color:#10b981;"></small>
                     </div>
                 </div>
             </div>
@@ -664,6 +664,7 @@ async function openAccountSettingsDrawer(renderInPlace) {
         }
         try {
             const result = await apiPost('sendAccountDeletionOtp', { customerId: state.currentUser.userID });
+            deleteOtpMsg.style.color = '#10b981';
             deleteOtpMsg.textContent = `OTP sent to ${result.email}. Check your inbox.`;
             otpGroupDelete.style.display = 'block';
         } catch (error) {
@@ -675,17 +676,26 @@ async function openAccountSettingsDrawer(renderInPlace) {
         const password = document.getElementById('deletePassword').value;
         const otp = document.getElementById('accountOtpDelete')?.value.trim();
 
-        if (!password) {
-            msgDiv.innerHTML = '<div class="error-message">Please enter your current password.</div>';
-            return;
-        }
-        if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
-            msgDiv.innerHTML = '<div class="error-message">Please enter a valid 6-digit OTP.</div>';
+        // Check if both password and OTP are provided
+        if (!password || !otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
+            // Subtle temporary message
+            deleteOtpMsg.style.color = '#e67e22'; // orange warning
+            deleteOtpMsg.textContent = 'Please provide both your password and OTP.';
+            setTimeout(() => {
+                deleteOtpMsg.textContent = '';
+                deleteOtpMsg.style.color = '#10b981'; // back to original green
+            }, 3000);
+
+            // Focus the missing field
+            if (!password) {
+                document.getElementById('deletePassword').focus();
+            } else {
+                document.getElementById('accountOtpDelete')?.focus();
+            }
             return;
         }
 
         try {
-            // Direct API call (does not depend on login.js)
             await apiPost('deleteAccount', {
                 customerId: state.currentUser.userID,
                 password: password,
