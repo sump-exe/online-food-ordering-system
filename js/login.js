@@ -136,7 +136,7 @@ function renderRegister() {
             <button id="doRegisterBtn" class="btn-primary" style="width:100%;padding:14px;">Send Verification OTP</button>
         </div>
         
-        <!-- Step 2: OTP + Password -->
+        <!-- Step 2: OTP + Password (shown immediately after clicking send) -->
         <div id="registerStep2" style="display:none;">
             <div class="form-group">
                 <label>Enter Verification OTP</label>
@@ -157,6 +157,11 @@ function renderRegister() {
                 <small style="color:#666;">- At least 1 special character (!@#$%^&*())</small>
             </div>
             <button id="verifyRegBtn" class="btn-primary" style="width:100%;padding:14px;">Verify & Create Account</button>
+            <div style="text-align:center;margin-top:12px;">
+                <small style="color:#666;">Didn't receive it? </small>
+                <a class="hyperlink" id="regResendOtpLink" style="font-size:0.85rem;">Resend OTP</a>
+                <span id="regResendTimer" style="color:#999;font-size:0.85rem;display:none;"></span>
+            </div>
         </div>
         
         <div style="text-align:center;margin-top:25px;">
@@ -199,6 +204,25 @@ function renderResetPassword() {
     </div>`;
 }
 
+// OTP cooldown timer helper (seconds)
+function startOtpCooldown(buttonOrLink, seconds = 60) {
+    if (!buttonOrLink) return;
+    const isButton = buttonOrLink.tagName === 'BUTTON';
+    const originalText = buttonOrLink.textContent;
+    buttonOrLink.disabled = true;
+    let remaining = seconds;
+    const interval = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+            clearInterval(interval);
+            buttonOrLink.disabled = false;
+            buttonOrLink.textContent = originalText;
+        } else {
+            buttonOrLink.textContent = `Resend OTP (${remaining}s)`;
+        }
+    }, 1000);
+}
+
 function closeForgotPasswordModal() {
     const modal = document.getElementById('forgotPasswordModal');
     if (modal) {
@@ -234,6 +258,7 @@ function showForgotPasswordDialog(renderInPlace) {
                     <div style="text-align:center;margin-top:15px;">
                         <small style="color:#666;">Didn't receive it? </small>
                         <a class="hyperlink" id="resendOtpLink">Resend OTP</a>
+                        <span id="resendOtpTimer" style="color:#999;font-size:0.85rem;display:none;"></span>
                     </div>
                 </div>
                 <div id="forgotPasswordStep3" style="display:none;">
@@ -263,7 +288,7 @@ function showForgotPasswordDialog(renderInPlace) {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-let currentUsername = '';
+	let currentUsername = '';
     let currentEmail = '';
     let currentOTP = '';
 
@@ -273,7 +298,7 @@ let currentUsername = '';
         e.target.value = String(e.target.value).replace(/\D/g, '').slice(0, 6);
     });
     
-    // Step 1: Request OTP
+    // Step 1: Send OTP – immediately show OTP input, start cooldown, then call API
     document.getElementById('requestResetBtn').addEventListener('click', async () => {
         const username = document.getElementById('resetUsername').value;
         const msgDiv = document.getElementById('forgotPasswordMessage');
@@ -283,20 +308,23 @@ let currentUsername = '';
             return;
         }
 
-try {
+        currentUsername = username;
+        // Immediately show Step 2
+        document.getElementById('forgotPasswordStep1').style.display = 'none';
+        document.getElementById('forgotPasswordStep2').style.display = 'block';
+        document.getElementById('otpInput').focus();
+        // Start cooldown on Resend link
+        const resendLink = document.getElementById('resendOtpLink');
+        startOtpCooldown(resendLink, 60);
+
+        try {
             const result = await requestPasswordReset(username, '');
-            currentUsername = username;
-            currentEmail = result.email || ''; // Capture the email from response
+            currentEmail = result.email || '';
             msgDiv.innerHTML = `
                 <div class="success-message">
-                    ${result.message}<br><br>
                     OTP sent to: <strong>${result.email}</strong>
                 </div>
             `;
-            // Show Step 2
-            document.getElementById('forgotPasswordStep1').style.display = 'none';
-            document.getElementById('forgotPasswordStep2').style.display = 'block';
-            document.getElementById('otpInput').focus();
         } catch (error) {
             msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
         }
@@ -315,10 +343,9 @@ try {
         document.getElementById('otpInput').value = otp;
 
         try {
-            const result = await verifyOTP(currentUsername, otp, currentEmail); // Pass email for verification
+            const result = await verifyOTP(currentUsername, otp, currentEmail);
             currentOTP = result.otp || otp;
             msgDiv.innerHTML = '<div class="success-message">OTP verified! Now set your new password.</div>';
-            // Show Step 3
             document.getElementById('forgotPasswordStep2').style.display = 'none';
             document.getElementById('forgotPasswordStep3').style.display = 'block';
             document.getElementById('newResetPassword').focus();
@@ -327,15 +354,16 @@ try {
         }
     });
 
-    // Resend OTP
+    // Resend OTP (with cooldown already started)
     document.getElementById('resendOtpLink').addEventListener('click', async () => {
         const msgDiv = document.getElementById('forgotPasswordMessage');
-        
+        const resendLink = document.getElementById('resendOtpLink');
+        if (resendLink.disabled) return;
+        startOtpCooldown(resendLink, 60);
         try {
             const result = await resendOTP(currentUsername);
             msgDiv.innerHTML = `
                 <div class="success-message">
-                    ${result.message}<br><br>
                     OTP sent to: <strong>${result.email}</strong>
                 </div>
             `;
@@ -360,7 +388,7 @@ try {
             return;
         }
 
-try {
+        try {
             const result = await resetPassword(currentOTP, currentUsername, newPassword, confirmPassword, currentEmail);
             msgDiv.innerHTML = `<div class="success-message">${result.message}</div>`;
             setTimeout(() => {
@@ -473,27 +501,45 @@ export function renderAuthScreen(root, callbacks) {
             return;
         }
 
-        const result = await registerUser(username, email);
-        if (result.success) {
+        // Immediately show Step 2
+        document.getElementById('registerStep1').style.display = 'none';
+        document.getElementById('registerStep2').style.display = 'block';
+        document.getElementById('regOtpInput').focus();
+        // Start cooldown on resend link
+        const resendLink = document.getElementById('regResendOtpLink');
+        startOtpCooldown(resendLink, 60);
+
+        try {
+            const result = await registerUser(username, email);
             msgDiv.innerHTML = `
                 <div class="success-message">
                     ${result.message}<br><br>
                     OTP sent to: <strong>${result.email}</strong>
                 </div>
             `;
-            // Show Step 2
-            document.getElementById('registerStep1').style.display = 'none';
-            document.getElementById('registerStep2').style.display = 'block';
-            document.getElementById('regOtpInput').focus();
-            return;
+        } catch (error) {
+            msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
         }
+    });
 
-        msgDiv.innerHTML = `<div class="error-message">${result.message}</div>`;
-        setTimeout(() => {
-            if (msgDiv) {
-                msgDiv.innerHTML = '';
-            }
-        }, 3000);
+    // Resend OTP for registration
+    document.getElementById('regResendOtpLink')?.addEventListener('click', async () => {
+        const msgDiv = document.getElementById('registerMessage');
+        const resendLink = document.getElementById('regResendOtpLink');
+        if (resendLink.disabled) return;
+        const username = document.getElementById('regUsername').value;
+        startOtpCooldown(resendLink, 60);
+        try {
+            const result = await resendOTP(username);
+            msgDiv.innerHTML = `
+                <div class="success-message">
+                    ${result.message}<br><br>
+                    OTP sent to: <strong>${result.email}</strong>
+                </div>
+            `;
+        } catch (error) {
+            msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        }
     });
 
     // Verify Registration OTP and create account
@@ -521,7 +567,6 @@ export function renderAuthScreen(root, callbacks) {
         const result = await verifyRegistration(username, otp, password);
         if (result.success) {
             msgDiv.innerHTML = `<div class="success-message">${result.message}</div>`;
-            // Auto login after verification
             setTimeout(async () => {
                 state.currentUser = result.user;
                 await renderApp();
@@ -537,7 +582,6 @@ export function renderAuthScreen(root, callbacks) {
         }, 3000);
     });
 
-    // Allow Enter key for OTP input
     document.getElementById('regOtpInput')?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') document.getElementById('verifyRegBtn')?.click();
     });

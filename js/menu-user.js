@@ -2,7 +2,6 @@ import { apiGet, apiPost } from './api.js';
 import { state } from './state.js';
 import { addToCart, getCartTotal, placeOrder, removeFromCart, updateQuantity } from './cart-user.js';
 import { cancelOrder, renderUserOrdersRows } from './order-history-user.js';
-// deleteAccount from login.js is NOT imported because we use apiPost directly here
 
 export async function loadUserMenuData(loadMenuItems, loadUserOrders) {
     await Promise.all([loadMenuItems(), loadUserOrders(state.currentUser.userID)]);
@@ -204,7 +203,6 @@ export function attachCustomerEvents(callbacks) {
             });
         };
 
-        // Set first category active on load
         if (sections[0]) setActive(sections[0].id);
 
         const observer = new IntersectionObserver(
@@ -217,7 +215,6 @@ export function attachCustomerEvents(callbacks) {
         );
         sections.forEach((section) => observer.observe(section));
 
-        // Smooth-scroll with offset for the sticky top bar
         categoryLinks.forEach((link) => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -481,6 +478,25 @@ async function saveAccountSettings(payload) {
     return apiPost('updateAccountSettings', payload);
 }
 
+// OTP cooldown helper (seconds)
+function startOtpCooldown(button, seconds = 60) {
+    if (!button) return;
+    button.disabled = true;
+    let remaining = seconds;
+    const originalText = button.textContent;
+    button.textContent = `Resend OTP (${remaining}s)`;
+    const interval = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+            clearInterval(interval);
+            button.disabled = false;
+            button.textContent = originalText;
+        } else {
+            button.textContent = `Resend OTP (${remaining}s)`;
+        }
+    }, 1000);
+}
+
 async function openAccountSettingsDrawer(renderInPlace) {
     const existingDrawer = document.getElementById('accountSettingsDrawer');
     const existingOverlay = document.getElementById('accountSettingsOverlay');
@@ -577,9 +593,10 @@ async function openAccountSettingsDrawer(renderInPlace) {
     const msgDiv = document.getElementById('accountSettingsMessage');
     const otpGroupPassword = document.getElementById('otpGroupPassword');
     const passwordOtpMsg = document.getElementById('passwordOtpMessage');
+    const sendPasswordOtpBtn = document.getElementById('sendPasswordOtpBtn');
 
     // --- Send OTP for password change ---
-    document.getElementById('sendPasswordOtpBtn')?.addEventListener('click', async () => {
+    sendPasswordOtpBtn?.addEventListener('click', async () => {
         const currentPwd = document.getElementById('accountCurrentPassword').value;
         const newPwd = document.getElementById('accountNewPassword').value;
         const confirmPwd = document.getElementById('accountConfirmPassword').value;
@@ -593,10 +610,13 @@ async function openAccountSettingsDrawer(renderInPlace) {
             return;
         }
 
+        // Immediately show OTP input, start cooldown
+        otpGroupPassword.style.display = 'block';
+        startOtpCooldown(sendPasswordOtpBtn, 60);
+
         try {
             const result = await apiPost('sendPasswordChangeOtp', { customerId: state.currentUser.userID });
             passwordOtpMsg.textContent = `OTP sent to ${result.email}. Check your inbox.`;
-            otpGroupPassword.style.display = 'block';
         } catch (error) {
             msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
         }
@@ -614,7 +634,6 @@ async function openAccountSettingsDrawer(renderInPlace) {
             confirmPassword: document.getElementById('accountConfirmPassword')?.value || '',
         };
 
-        // If new password is being changed, require OTP
         if (payload.newPassword) {
             const otp = document.getElementById('accountOtpPassword')?.value.trim();
             if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
@@ -638,7 +657,6 @@ async function openAccountSettingsDrawer(renderInPlace) {
     });
 
     // --- Account deletion flow ---
-    const deleteSection = document.getElementById('deleteAccountSection');
     const initiateBtn = document.getElementById('initiateDeleteBtn');
     const confirmForm = document.getElementById('deleteConfirmationForm');
     const sendDeleteOtpBtn = document.getElementById('sendDeleteOtpBtn');
@@ -662,11 +680,15 @@ async function openAccountSettingsDrawer(renderInPlace) {
             msgDiv.innerHTML = '<div class="error-message">Please enter your current password first.</div>';
             return;
         }
+
+        // Immediately show OTP input, start cooldown
+        otpGroupDelete.style.display = 'block';
+        startOtpCooldown(sendDeleteOtpBtn, 60);
+
         try {
             const result = await apiPost('sendAccountDeletionOtp', { customerId: state.currentUser.userID });
             deleteOtpMsg.style.color = '#10b981';
             deleteOtpMsg.textContent = `OTP sent to ${result.email}. Check your inbox.`;
-            otpGroupDelete.style.display = 'block';
         } catch (error) {
             msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
         }
@@ -676,17 +698,14 @@ async function openAccountSettingsDrawer(renderInPlace) {
         const password = document.getElementById('deletePassword').value;
         const otp = document.getElementById('accountOtpDelete')?.value.trim();
 
-        // Check if both password and OTP are provided
         if (!password || !otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
-            // Subtle temporary message
-            deleteOtpMsg.style.color = '#e67e22'; // orange warning
+            deleteOtpMsg.style.color = '#e67e22';
             deleteOtpMsg.textContent = 'Please provide both your password and OTP.';
             setTimeout(() => {
                 deleteOtpMsg.textContent = '';
-                deleteOtpMsg.style.color = '#10b981'; // back to original green
+                deleteOtpMsg.style.color = '#10b981';
             }, 3000);
 
-            // Focus the missing field
             if (!password) {
                 document.getElementById('deletePassword').focus();
             } else {
