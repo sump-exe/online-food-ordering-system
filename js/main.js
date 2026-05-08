@@ -4,11 +4,11 @@ import {
     attachAdminMenuInventoryEvents,
     loadCategories as loadFoodCategories,
     loadMenuItems,
-    loadDeletedMenuItems,          // new
+    loadDeletedMenuItems,
     renderAdminMenuPage,
     renderAdminNavBar,
-    renderDeletedMenuItemsSection, // new
-    attachTrashItemEvents,         // new
+    renderDeletedMenuItemsSection,
+    attachTrashItemEvents,
 } from './menu-inventory-admin.js';
 import { loadAdminSalesData, renderAdminSalesPage, attachSalesEvents } from './sales-report-admin.js';
 import { attachAdminOrderEvents, loadAdminOrders, renderAdminOrdersPage } from './order-history-admin.js';
@@ -90,6 +90,13 @@ export function renderInPlace() {
         return;
     }
 
+    // Save customer scroll position and active category before destroying the DOM
+    if (state.currentUser && state.currentUser.role === 'customer') {
+        const activeLink = document.querySelector('.customer-category-link.active');
+        state.activeCustomerCategory = activeLink ? activeLink.getAttribute('href').substring(1) : null;
+        state.customerScrollPos = window.scrollY;
+    }
+
     if (state.currentUser.role === 'admin') {
         root.innerHTML = renderAdminLayout();
         attachAdminMenuInventoryEvents({ renderApp, setAdminPage, logout });
@@ -154,6 +161,7 @@ export function renderInPlace() {
         return;
     }
 
+    // Customer page
     root.innerHTML = renderCustomerPage();
     attachCustomerEvents({ renderApp, renderInPlace, logout });
 }
@@ -185,7 +193,7 @@ export async function renderApp() {
                 loadUsers(),
                 loadInventoryData(),
                 loadDeletedCategories(),
-                loadDeletedMenuItems(),   // load deleted items
+                loadDeletedMenuItems(),
             ]);
         } else {
             console.log('Loading customer data...');

@@ -203,7 +203,17 @@ export function attachCustomerEvents(callbacks) {
             });
         };
 
-        if (sections[0]) setActive(sections[0].id);
+        // Restore saved active category and scroll position (if any) immediately
+        if (state.activeCustomerCategory) {
+            setActive(state.activeCustomerCategory);
+            window.scrollTo({ top: state.customerScrollPos, behavior: 'instant' });
+            // Clear saved state so it only applies once
+            state.activeCustomerCategory = null;
+            state.customerScrollPos = 0;
+        } else {
+            // Set first category active on load
+            if (sections[0]) setActive(sections[0].id);
+        }
 
         const observer = new IntersectionObserver(
             (entries) => {
@@ -215,6 +225,7 @@ export function attachCustomerEvents(callbacks) {
         );
         sections.forEach((section) => observer.observe(section));
 
+        // Smooth-scroll with offset for the sticky top bar
         categoryLinks.forEach((link) => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();

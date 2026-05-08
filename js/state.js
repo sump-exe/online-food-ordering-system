@@ -8,7 +8,7 @@ export const state = {
     categories: [],
     adminCategories: [],
     deletedAdminCategories: [],
-    deletedMenuItems: [],       // new
+    deletedMenuItems: [],
     tags: [],
     orders: [],
     users: [],
@@ -45,5 +45,8 @@ export const state = {
         Preparing: 0,
         Complete: 0,
         Cancelled: 0
-    }
+    },
+    // Used to preserve customer menu state across re-renders
+    activeCustomerCategory: null,
+    customerScrollPos: 0
 };
