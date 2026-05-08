@@ -81,12 +81,19 @@ function showPaymentSuccessModal(payment, renderApp) {
     const modal = document.getElementById('paymentSuccessModal');
     const receiptNumber = payment.receipt_number;
 
-    // Event handlers
-    document.getElementById('closeSuccessModal').addEventListener('click', () => modal.remove());
-    document.getElementById('backHomeBtn').addEventListener('click', () => {
+    // Helper: dismiss modal and force a full re-render so the main menu updates
+    const dismissAndRefresh = () => {
         modal.remove();
-        renderApp();               // <-- stays logged in, returns to menu
-    });
+        renderApp();
+    };
+
+    // Close button
+    document.getElementById('closeSuccessModal').addEventListener('click', dismissAndRefresh);
+
+    // "Back to Home" button
+    document.getElementById('backHomeBtn').addEventListener('click', dismissAndRefresh);
+
+    // View/Download/Print buttons – they do NOT refresh the main page
     document.getElementById('viewReceiptBtn').addEventListener('click', () => {
         modal.remove();
         showReceipt(receiptNumber);
@@ -98,9 +105,10 @@ function showPaymentSuccessModal(payment, renderApp) {
         printReceipt(receiptNumber);
     });
 
+    // Click on overlay dismisses and refreshes
     modal.addEventListener('click', (event) => {
         if (event.target === modal) {
-            modal.remove();
+            dismissAndRefresh();
         }
     });
 }
