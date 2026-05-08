@@ -102,7 +102,7 @@ function showEditTagModal(tag, onSave, onClose) {
         <div class="modal-container" style="max-width: 450px;">
             <div class="modal-header">
                 <h2>✏️ Edit Tag</h2>
-                <button class="modal-close" id="closeModalBtn">&times;</button>
+                <button class="modal-close" data-close>&times;</button>
             </div>
             <div class="modal-body">
                 <div id="modalMessage" class="modal-message" style="display: none;"></div>
@@ -112,7 +112,7 @@ function showEditTagModal(tag, onSave, onClose) {
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="cancelModalBtn" class="btn-secondary">Cancel</button>
+                <button id="cancelModalBtn" class="btn-secondary" data-close>Cancel</button>
                 <button id="saveTagBtn" class="btn-primary">Save Changes</button>
             </div>
         </div>
@@ -123,15 +123,24 @@ function showEditTagModal(tag, onSave, onClose) {
     const modal = document.getElementById('editTagModal');
     const nameInput = document.getElementById('editTagName');
     const saveBtn = document.getElementById('saveTagBtn');
-    const cancelBtn = document.getElementById('cancelModalBtn');
-    const closeBtn = document.getElementById('closeModalBtn');
     const messageDiv = document.getElementById('modalMessage');
-    
+
+    const originalName = tag.name;
+
     const closeModal = () => {
         modal.remove();
         if (onClose) onClose();
     };
-    
+
+    const attemptClose = () => {
+        if (nameInput.value.trim() !== originalName) {
+            if (!confirm('There are still some unsaved changes, are you sure you want to exit?')) {
+                return;
+            }
+        }
+        closeModal();
+    };
+
     const showMessage = (message, isError = true) => {
         messageDiv.textContent = message;
         messageDiv.className = `modal-message ${isError ? 'error' : 'success'}`;
@@ -140,6 +149,13 @@ function showEditTagModal(tag, onSave, onClose) {
             messageDiv.style.display = 'none';
         }, 3000);
     };
+
+    // Delegate close via overlay click or any [data-close] button
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal || e.target.hasAttribute('data-close')) {
+            attemptClose();
+        }
+    });
     
     saveBtn.addEventListener('click', async () => {
         const newName = nameInput.value.trim();
@@ -158,12 +174,9 @@ function showEditTagModal(tag, onSave, onClose) {
         }
     });
     
-    cancelBtn.addEventListener('click', closeModal);
-    closeBtn.addEventListener('click', closeModal);
-    
     const handleEscape = (e) => {
         if (e.key === 'Escape') {
-            closeModal();
+            attemptClose();
             document.removeEventListener('keydown', handleEscape);
         }
     };
@@ -173,9 +186,7 @@ function showEditTagModal(tag, onSave, onClose) {
     nameInput.select();
 }
 
-// RENAMED modal function with unique ID
 function showDeleteTagConfirmModal(tagId, tagName, usageCount, onConfirm) {
-    // Remove any existing tag delete modal first
     const existing = document.getElementById('deleteTagConfirmModal');
     if (existing) existing.remove();
 

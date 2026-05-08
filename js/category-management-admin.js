@@ -150,7 +150,6 @@ export function renderAdminTrashPage() {
         </div>`;
     }
 
-    // Split into two columns
     const midPoint = Math.ceil(categories.length / 2);
     const leftColumn = categories.slice(0, midPoint);
     const rightColumn = categories.slice(midPoint);
@@ -248,7 +247,7 @@ function showAddCategoryModal(onSave, onClose) {
         <div class="modal-container">
             <div class="modal-header">
                 <h2>Add New Category</h2>
-                <button class="modal-close" id="closeModalBtn">&times;</button>
+                <button class="modal-close" data-close>&times;</button>
             </div>
             <div class="modal-body">
                 <div id="modalMessage" class="modal-message" style="display: none;"></div>
@@ -266,7 +265,7 @@ function showAddCategoryModal(onSave, onClose) {
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="cancelModalBtn" class="btn-secondary">Cancel</button>
+                <button id="cancelModalBtn" class="btn-secondary" data-close>Cancel</button>
                 <button id="saveCategoryBtn" class="btn-primary">Save Category</button>
             </div>
         </div>
@@ -279,8 +278,6 @@ function showAddCategoryModal(onSave, onClose) {
     const nameInput = document.getElementById('categoryName');
     const descInput = document.getElementById('categoryDescription');
     const saveBtn = document.getElementById('saveCategoryBtn');
-    const cancelBtn = document.getElementById('cancelModalBtn');
-    const closeBtn = document.getElementById('closeModalBtn');
     const messageDiv = document.getElementById('modalMessage');
 
     const closeModal = () => {
@@ -293,6 +290,13 @@ function showAddCategoryModal(onSave, onClose) {
         messageDiv.className = `modal-message ${isError ? 'error' : 'success'}`;
         messageDiv.style.display = 'block';
     };
+
+    // Close via any [data-close] button or overlay click (but only overlay)
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal || e.target.hasAttribute('data-close')) {
+            closeModal();
+        }
+    });
 
     saveBtn.addEventListener('click', async () => {
         const categoryType = typeSelect.value;
@@ -317,8 +321,6 @@ function showAddCategoryModal(onSave, onClose) {
         }
     });
 
-    cancelBtn.addEventListener('click', closeModal);
-    closeBtn.addEventListener('click', closeModal);
     nameInput.focus();
 }
 
@@ -334,7 +336,7 @@ function showEditCategoryModal(category, onUpdate, onClose) {
         <div class="modal-container">
             <div class="modal-header">
                 <h2>Edit Category</h2>
-                <button class="modal-close" id="closeModalBtn">&times;</button>
+                <button class="modal-close" data-close>&times;</button>
             </div>
             <div class="modal-body">
                 <div id="modalMessage" class="modal-message" style="display: none;"></div>
@@ -352,7 +354,7 @@ function showEditCategoryModal(category, onUpdate, onClose) {
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="cancelModalBtn" class="btn-secondary">Cancel</button>
+                <button id="cancelModalBtn" class="btn-secondary" data-close>Cancel</button>
                 <button id="updateCategoryBtn" class="btn-primary">Update Category</button>
             </div>
         </div>
@@ -365,14 +367,40 @@ function showEditCategoryModal(category, onUpdate, onClose) {
     const nameInput = document.getElementById('categoryName');
     const descInput = document.getElementById('categoryDescription');
     const updateBtn = document.getElementById('updateCategoryBtn');
-    const cancelBtn = document.getElementById('cancelModalBtn');
-    const closeBtn = document.getElementById('closeModalBtn');
     const messageDiv = document.getElementById('modalMessage');
+
+    // Original values for unsaved‑changes check
+    const original = {
+        name: category.name,
+        description: category.description || '',
+        category_type: category.category_type
+    };
 
     const closeModal = () => {
         modal.remove();
         if (onClose) onClose();
     };
+
+    const attemptClose = () => {
+        if (hasChanges()) {
+            if (!confirm('There are still some unsaved changes, are you sure you want to exit?')) {
+                return;
+            }
+        }
+        closeModal();
+    };
+
+    const hasChanges = () =>
+        nameInput.value.trim() !== original.name ||
+        descInput.value.trim() !== original.description ||
+        typeSelect.value !== original.category_type;
+
+    // Delegate close actions on the overlay
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal || e.target.hasAttribute('data-close')) {
+            attemptClose();
+        }
+    });
 
     const showMessage = (message) => {
         messageDiv.textContent = message;
@@ -400,8 +428,6 @@ function showEditCategoryModal(category, onUpdate, onClose) {
         }
     });
 
-    cancelBtn.addEventListener('click', closeModal);
-    closeBtn.addEventListener('click', closeModal);
     nameInput.focus();
     nameInput.select();
 }
