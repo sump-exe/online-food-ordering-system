@@ -41,21 +41,6 @@ $paymentReceiptActions = [
         $transactionDateTime = date('Y-m-d H:i:s');
 
         $stmt = $conn->prepare("
-            UPDATE payments 
-            SET payment_method = ?, 
-                amount_paid = ?, 
-                change_amount = ?,
-                payment_status = 'Success',
-                receipt_number = ?,
-                transaction_datetime = ?,
-                receipt_generated = TRUE
-            WHERE OrderID = ?
-        ");
-        $stmt->bind_param('sddssi', $paymentMethod, $finalAmountPaid, $changeAmount, $receiptNumber, $transactionDateTime, $orderId);
-        $stmt->execute();
-        $stmt->close();
-        
-        $stmt = $conn->prepare("
             SELECT oi.ItemID, oi.quantity, oi.price,
                    m.name as item_name, c.name as category_name
             FROM orderitems oi
@@ -93,23 +78,35 @@ $paymentReceiptActions = [
             'change_amount' => $changeAmount
         ]);
 
+        $adminName = 'Customer Self-Service';
         $receiptStmt = $conn->prepare("
-            INSERT INTO receipts (receipt_number, order_id, customer_id, customer_name, 
-                                  payment_method, subtotal, tax, total_amount, 
+            INSERT INTO receipts (receipt_number, subtotal, tax, total_amount, 
                                   amount_paid, change_amount, transaction_datetime, 
                                   receipt_data, generated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $adminName = 'Customer Self-Service';
-        $receiptStmt->bind_param('siissdddddsss', 
-            $receiptNumber, $orderId, $customerId, $orderData['customer_name'],
-            $paymentMethod, $subtotal, $tax, $total,
+        $receiptStmt->bind_param('sdddddsss', 
+            $receiptNumber, $subtotal, $tax, $total,
             $finalAmountPaid, $changeAmount, $transactionDateTime,
             $receiptData, $adminName
         );
         $receiptStmt->execute();
         $receiptId = $receiptStmt->insert_id;
         $receiptStmt->close();
+        
+        // Update payments table with receipt_id and payment details
+        $stmt = $conn->prepare("
+            UPDATE payments 
+            SET payment_method = ?, 
+                customer_name = ?,
+                payment_status = 'Success',
+                receipt_id = ?,
+                receipt_generated = TRUE
+            WHERE OrderID = ?
+        ");
+        $stmt->bind_param('ssii', $paymentMethod, $orderData['customer_name'], $receiptId, $orderId);
+        $stmt->execute();
+        $stmt->close();
         
         respond([
             'success' => true,
@@ -136,9 +133,14 @@ $paymentReceiptActions = [
         }
         
         $query = "
-            SELECT r.*, o.Status as order_status
+            SELECT r.receipt_id, r.receipt_number, r.subtotal, r.tax, r.discount,
+                   r.total_amount, r.amount_paid, r.change_amount, r.transaction_datetime, 
+                   r.receipt_data, r.generated_by,
+                   p.payment_method, p.payment_status, p.OrderID, p.customerID, p.customer_name,
+                   o.Status as order_status
             FROM receipts r
-            JOIN orders o ON o.OrderID = r.order_id
+            LEFT JOIN payments p ON p.receipt_id = r.receipt_id
+            LEFT JOIN orders o ON o.OrderID = p.OrderID
         ";
         
         if (!empty($receiptNumber)) {
@@ -146,7 +148,7 @@ $paymentReceiptActions = [
             $stmt = $conn->prepare($query);
             $stmt->bind_param('s', $receiptNumber);
         } else {
-            $query .= " WHERE r.order_id = ?";
+            $query .= " WHERE p.OrderID = ?";
             $stmt = $conn->prepare($query);
             $stmt->bind_param('i', $orderId);
         }
@@ -165,10 +167,10 @@ $paymentReceiptActions = [
         
         respond([
             'receipt' => [
-                'receipt_id' => $receipt['receipt_id'],
+                'receipt_id' => (int)$receipt['receipt_id'],
                 'receipt_number' => $receipt['receipt_number'],
-                'order_id' => $receipt['order_id'],
-                'customer_name' => $receipt['customer_name'],
+                'order_id' => (int)$receipt['OrderID'],
+                'customer_name' => $receipt['customer_name'] ?? $receiptData['customer_name'] ?? 'N/A',
                 'payment_method' => $receipt['payment_method'],
                 'subtotal' => (float)$receipt['subtotal'],
                 'tax' => (float)$receipt['tax'],
@@ -191,11 +193,12 @@ $paymentReceiptActions = [
         }
         
         $stmt = $conn->prepare("
-            SELECT receipt_number, order_id, total_amount, payment_method, 
-                   transaction_datetime, receipt_id
-            FROM receipts
-            WHERE customer_id = ?
-            ORDER BY transaction_datetime DESC
+            SELECT r.receipt_number, r.total_amount, r.transaction_datetime, 
+                   r.receipt_id, p.OrderID, p.payment_method
+            FROM receipts r
+            JOIN payments p ON p.receipt_id = r.receipt_id
+            WHERE p.customerID = ?
+            ORDER BY r.transaction_datetime DESC
         ");
         $stmt->bind_param('i', $customerId);
         $stmt->execute();
@@ -204,10 +207,11 @@ $paymentReceiptActions = [
         while ($row = $result->fetch_assoc()) {
             $receipts[] = [
                 'receipt_number' => $row['receipt_number'],
-                'order_id' => $row['order_id'],
+                'order_id' => (int)$row['OrderID'],
                 'total_amount' => (float)$row['total_amount'],
                 'payment_method' => $row['payment_method'],
-                'transaction_datetime' => $row['transaction_datetime']
+                'transaction_datetime' => $row['transaction_datetime'],
+                'receipt_id' => (int)$row['receipt_id']
             ];
         }
         $stmt->close();
