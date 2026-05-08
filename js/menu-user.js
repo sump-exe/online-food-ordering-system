@@ -207,11 +207,9 @@ export function attachCustomerEvents(callbacks) {
         if (state.activeCustomerCategory) {
             setActive(state.activeCustomerCategory);
             window.scrollTo({ top: state.customerScrollPos, behavior: 'instant' });
-            // Clear saved state so it only applies once
             state.activeCustomerCategory = null;
             state.customerScrollPos = 0;
         } else {
-            // Set first category active on load
             if (sections[0]) setActive(sections[0].id);
         }
 
@@ -225,7 +223,6 @@ export function attachCustomerEvents(callbacks) {
         );
         sections.forEach((section) => observer.observe(section));
 
-        // Smooth-scroll with offset for the sticky top bar
         categoryLinks.forEach((link) => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -426,7 +423,6 @@ function openOrderHistoryDrawer(renderInPlace, renderApp) {
     if (existingDrawer) existingDrawer.remove();
     if (existingOverlay) existingOverlay.remove();
 
-    // ---------- Widened the drawer (increased max-width to 700px) ----------
     const drawerHtml = `
     <div id="orderHistoryOverlay" class="order-history-overlay open"></div>
     <aside id="orderHistoryDrawer" class="order-history-drawer open" style="width: min(700px, 95vw);">
@@ -438,7 +434,6 @@ function openOrderHistoryDrawer(renderInPlace, renderApp) {
             <button class="btn-secondary order-history-close" id="closeOrderHistoryBtn">Close</button>
         </div>
         <div class="order-history-drawer-body">
-            <!-- This container will scroll horizontally if needed -->
             <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
                 <table style="width: 100%; min-width: 580px; border-collapse: collapse;">
                     <thead>
@@ -623,7 +618,6 @@ async function openAccountSettingsDrawer(renderInPlace) {
             return;
         }
 
-        // Immediately show OTP input, start cooldown
         otpGroupPassword.style.display = 'block';
         startOtpCooldown(sendPasswordOtpBtn, 60);
 
@@ -635,7 +629,7 @@ async function openAccountSettingsDrawer(renderInPlace) {
         }
     });
 
-    // --- Save changes ---
+    // --- Save changes (with subtle loading indicator) ---
     document.getElementById('saveAccountSettingsBtn')?.addEventListener('click', async () => {
         msgDiv.innerHTML = '';
         const payload = {
@@ -647,6 +641,7 @@ async function openAccountSettingsDrawer(renderInPlace) {
             confirmPassword: document.getElementById('accountConfirmPassword')?.value || '',
         };
 
+        // If new password is being changed, require OTP
         if (payload.newPassword) {
             const otp = document.getElementById('accountOtpPassword')?.value.trim();
             if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
@@ -655,6 +650,9 @@ async function openAccountSettingsDrawer(renderInPlace) {
             }
             payload.otp = otp;
         }
+
+        // Show subtle loading message
+        msgDiv.innerHTML = '<div style="text-align:center;padding:10px;color:#999;">Updating password…</div>';
 
         try {
             const result = await saveAccountSettings(payload);
@@ -694,7 +692,6 @@ async function openAccountSettingsDrawer(renderInPlace) {
             return;
         }
 
-        // Immediately show OTP input, start cooldown
         otpGroupDelete.style.display = 'block';
         startOtpCooldown(sendDeleteOtpBtn, 60);
 
