@@ -81,12 +81,14 @@ $adminMenuInventoryActions = [
         ]);
     },
     
+    // Updated to read from $_POST and $_FILES when form data is sent
     'updateMenuItem' => function ($conn, $body) {
-        $itemId = (int)($body['itemId'] ?? 0);
-        $name = trim($body['name'] ?? '');
-        $price = (int)($body['price'] ?? 0);
-        $stock = (int)($body['stock'] ?? 0);
-        $categoryID = (int)($body['categoryID'] ?? 0);
+        // Use $_POST for fields (multipart/form-data)
+        $itemId = (int)($_POST['itemId'] ?? 0);
+        $name = trim($_POST['name'] ?? '');
+        $price = (int)($_POST['price'] ?? 0);
+        $stock = (int)($_POST['stock'] ?? 0);
+        $categoryID = (int)($_POST['categoryID'] ?? 0);
         
         if ($itemId <= 0) {
             respondError('Invalid item ID.');
