@@ -42,14 +42,15 @@ define('GMAIL_SMTP_PORT', 587);
 define('GMAIL_SMTP_ENCRYPTION', 'tls');
 
 /**
- * Send OTP email for password reset
+ * Send OTP email (for password reset, account deletion, etc.)
  * 
  * @param string $email Recipient email address
  * @param string $otp 6-digit OTP code
  * @param string $username Username of the account
+ * @param string $subject Optional subject line (default: Password Reset OTP - FoodieDash)
  * @return array Result with success status and message
  */
-function sendOTPEmail($email, $otp, $username) {
+function sendOTPEmail($email, $otp, $username, $subject = 'Password Reset OTP - FoodieDash') {
     $mail = new PHPMailer(true);
     
     try {
@@ -70,7 +71,7 @@ function sendOTPEmail($email, $otp, $username) {
         // Content
         $mail->isHTML(true);
         $mail->CharSet = 'UTF-8';
-        $mail->Subject = 'Password Reset OTP - FoodieDash';
+        $mail->Subject = $subject;
         $mail->Body = '
         <html>
         <head>

@@ -202,7 +202,7 @@ $loginActions = [
         // Insert new OTP with explicit type
         createOtpRecord($conn, $username, $email, $otp, 'password_reset');
 
-        // Send OTP via email
+        // Send OTP via email (default subject)
         $emailResult = sendOTPEmail($email, $otp, $username);
         
         if (!$emailResult['success']) {
@@ -326,7 +326,7 @@ $loginActions = [
         // Insert new OTP with explicit type
         createOtpRecord($conn, $username, $email, $otp, 'password_reset');
 
-        // Send OTP via email
+        // Send OTP via email (default subject)
         $emailResult = sendOTPEmail($email, $otp, $username);
         
         if (!$emailResult['success']) {
@@ -465,6 +465,7 @@ $loginActions = [
         $stmt->execute();
         $stmt->close();
         createOtpRecord($conn, $customer['username'], $customer['email'], $otp, 'password_change');
+        // Use default subject for password change OTP (Password Reset OTP - FoodieDash)
         $emailResult = sendOTPEmail($customer['email'], $otp, $customer['username']);
         if (!$emailResult['success']) respondError('Failed to send OTP: ' . $emailResult['message']);
         respond(['success' => true, 'message' => 'OTP sent to your email.', 'email' => maskEmail($customer['email'])]);
@@ -486,7 +487,8 @@ $loginActions = [
         $stmt->execute();
         $stmt->close();
         createOtpRecord($conn, $customer['username'], $customer['email'], $otp, 'account_deletion');
-        $emailResult = sendOTPEmail($customer['email'], $otp, $customer['username']);
+        // Send with custom subject
+        $emailResult = sendOTPEmail($customer['email'], $otp, $customer['username'], 'Account Deletion OTP - FoodieDash');
         if (!$emailResult['success']) respondError('Failed to send OTP: ' . $emailResult['message']);
         respond(['success' => true, 'message' => 'OTP sent to your email.', 'email' => maskEmail($customer['email'])]);
     },
