@@ -231,7 +231,7 @@ function sendVerificationEmail($email, $otp, $username) {
                 .logo { color: #ff5722; font-size: 24px; font-weight: bold; }
                 .content { font-size: 16px; color: #333; }
                 .otp-box { 
-                    background: linear-gradient(135deg, #10b981, #059669); 
+                    background: linear-gradient(135deg, #ff5722, #ff9800); 
                     color: white; 
                     padding: 20px; 
                     text-align: center; 
