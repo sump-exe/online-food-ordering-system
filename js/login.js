@@ -36,9 +36,9 @@ export function logout(renderApp) {
     renderApp();
 }
 
-export async function registerUser(username, password, email) {
+export async function registerUser(username, email) {
     try {
-        const data = await apiPost('register', { username, password, email });
+        const data = await apiPost('register', { username, email });
         return { success: true, message: data.message, email: data.email };
     } catch (error) {
         return { success: false, message: error.message };
@@ -83,8 +83,8 @@ export async function verifyResetToken(token, username) {
     }
 }
 
-export async function deleteAccount(customerId, password) {
-    return apiPost('deleteAccount', { customerId, password });
+export async function deleteAccount(customerId, password, otp = '') {
+    return apiPost('deleteAccount', { customerId, password, otp });
 }
 
 export function showRegisterPage(renderInPlace) {
@@ -126,26 +126,17 @@ function renderRegister() {
         <div style="text-align:center;margin-bottom:30px;">
             <h1 style="color:#ff5722;margin-top:10px;">Create Account</h1>
             <p style="color:#666;">Join FoodieDash today</p>
-            <p style="color:#10b981;font-size:0.85rem;margin-top:8px;">Your password will be encrypted</p>
         </div>
         <div id="registerMessage"></div>
         
-        <!-- Step 1: Initial Registration -->
+        <!-- Step 1: Username and Email only -->
         <div id="registerStep1">
             <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="Choose a username"></div>
             <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="Enter your email"></div>
-            <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Create a password"></div>
-            <div class="form-group"><label>Confirm Password</label><input type="password" id="regConfirmPassword" placeholder="Confirm your password"></div>
-            <div style="background:#fff5e6;padding:12px;border-radius:12px;margin-bottom:20px;">
-                <small style="color:#ff5722;">Password Requirements:</small><br>
-                <small style="color:#666;">- At least 8 characters long</small><br>
-                <small style="color:#666;">- At least 1 uppercase letter (A-Z)</small><br>
-                <small style="color:#666;">- At least 1 special character (!@#$%^&*())</small>
-            </div>
             <button id="doRegisterBtn" class="btn-primary" style="width:100%;padding:14px;">Send Verification OTP</button>
         </div>
         
-        <!-- Step 2: OTP Verification -->
+        <!-- Step 2: OTP + Password -->
         <div id="registerStep2" style="display:none;">
             <div class="form-group">
                 <label>Enter Verification OTP</label>
@@ -153,11 +144,17 @@ function renderRegister() {
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="regOtpPassword" placeholder="Enter your password">
+                <input type="password" id="regOtpPassword" placeholder="Create a password">
             </div>
             <div class="form-group">
                 <label>Confirm Password</label>
                 <input type="password" id="regOtpConfirmPassword" placeholder="Confirm your password">
+            </div>
+            <div style="background:#fff5e6;padding:12px;border-radius:12px;margin-bottom:20px;">
+                <small style="color:#ff5722;">Password Requirements:</small><br>
+                <small style="color:#666;">- At least 8 characters long</small><br>
+                <small style="color:#666;">- At least 1 uppercase letter (A-Z)</small><br>
+                <small style="color:#666;">- At least 1 special character (!@#$%^&*())</small>
             </div>
             <button id="verifyRegBtn" class="btn-primary" style="width:100%;padding:14px;">Verify & Create Account</button>
         </div>
@@ -465,23 +462,18 @@ export function renderAuthScreen(root, callbacks) {
         return;
     }
 
-document.getElementById('doRegisterBtn').addEventListener('click', async () => {
+    // Registration flow
+    document.getElementById('doRegisterBtn').addEventListener('click', async () => {
         const username = document.getElementById('regUsername').value;
         const email = document.getElementById('regEmail').value;
-        const password = document.getElementById('regPassword').value;
-        const confirmPassword = document.getElementById('regConfirmPassword').value;
         const msgDiv = document.getElementById('registerMessage');
 
-        if (!username || !email || !password) {
+        if (!username || !email) {
             msgDiv.innerHTML = '<div class="error-message">Please fill all fields</div>';
             return;
         }
-        if (password !== confirmPassword) {
-            msgDiv.innerHTML = '<div class="error-message">Passwords do not match</div>';
-            return;
-        }
 
-        const result = await registerUser(username, password, email);
+        const result = await registerUser(username, email);
         if (result.success) {
             msgDiv.innerHTML = `
                 <div class="success-message">

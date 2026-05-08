@@ -46,22 +46,17 @@ $loginActions = [
     },
     'register' => function ($conn, $body) {
         $username = trim($body['username'] ?? '');
-        $password = $body['password'] ?? '';
         $email = trim($body['email'] ?? '');
 
-        if (!$username || !$password) {
-            respondError('Username and password are required.');
+        if (!$username) {
+            respondError('Username is required.');
         }
-
         if (!$email) {
             respondError('Email is required for registration.');
         }
-
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             respondError('Invalid email address.');
         }
-
-        validatePassword($password);
 
         if (checkUsernameExists($conn, $username)) {
             respondError('Username already exists.');
