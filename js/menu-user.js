@@ -426,9 +426,10 @@ function openOrderHistoryDrawer(renderInPlace, renderApp) {
     if (existingDrawer) existingDrawer.remove();
     if (existingOverlay) existingOverlay.remove();
 
+    // ---------- Widened the drawer (increased max-width to 700px) ----------
     const drawerHtml = `
     <div id="orderHistoryOverlay" class="order-history-overlay open"></div>
-    <aside id="orderHistoryDrawer" class="order-history-drawer open">
+    <aside id="orderHistoryDrawer" class="order-history-drawer open" style="width: min(700px, 95vw);">
         <div class="order-history-drawer-header">
             <div>
                 <div class="order-history-kicker">Customer</div>
@@ -437,16 +438,17 @@ function openOrderHistoryDrawer(renderInPlace, renderApp) {
             <button class="btn-secondary order-history-close" id="closeOrderHistoryBtn">Close</button>
         </div>
         <div class="order-history-drawer-body">
-            <div style="overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse;">
+            <!-- This container will scroll horizontally if needed -->
+            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                <table style="width: 100%; min-width: 580px; border-collapse: collapse;">
                     <thead>
                         <tr>
-                            <th style="text-align:left;padding:12px 8px;">Order ID</th>
-                            <th style="text-align:left;padding:12px 8px;">Date</th>
-                            <th style="text-align:left;padding:12px 8px;">Total</th>
-                            <th style="text-align:left;padding:12px 8px;">Status</th>
-                            <th style="text-align:left;padding:12px 8px;">Payment Ref</th>
-                            <th style="text-align:left;padding:12px 8px;">Action</th>
+                            <th style="text-align:left; padding:12px 8px; white-space: nowrap;">Order ID</th>
+                            <th style="text-align:left; padding:12px 8px; white-space: nowrap;">Date</th>
+                            <th style="text-align:left; padding:12px 8px; white-space: nowrap;">Total</th>
+                            <th style="text-align:left; padding:12px 8px; white-space: nowrap;">Status</th>
+                            <th style="text-align:left; padding:12px 8px; white-space: nowrap;">Payment Ref</th>
+                            <th style="text-align:left; padding:12px 8px; white-space: nowrap;">Action</th>
                         </tr>
                     </thead>
                     <tbody>${renderUserOrdersRows()}</tbody>
