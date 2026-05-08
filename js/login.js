@@ -129,14 +129,12 @@ function renderRegister() {
         </div>
         <div id="registerMessage"></div>
         
-        <!-- Step 1: Username and Email only -->
         <div id="registerStep1">
             <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="Choose a username"></div>
             <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="Enter your email"></div>
             <button id="doRegisterBtn" class="btn-primary" style="width:100%;padding:14px;">Send Verification OTP</button>
         </div>
         
-        <!-- Step 2: OTP + Password (shown immediately after clicking send) -->
         <div id="registerStep2" style="display:none;">
             <div class="form-group">
                 <label>Enter Verification OTP</label>
@@ -160,7 +158,6 @@ function renderRegister() {
             <div style="text-align:center;margin-top:12px;">
                 <small style="color:#666;">Didn't receive it? </small>
                 <a class="hyperlink" id="regResendOtpLink" style="font-size:0.85rem;">Resend OTP</a>
-                <span id="regResendTimer" style="color:#999;font-size:0.85rem;display:none;"></span>
             </div>
         </div>
         
@@ -204,21 +201,36 @@ function renderResetPassword() {
     </div>`;
 }
 
-// OTP cooldown timer helper (seconds)
-function startOtpCooldown(buttonOrLink, seconds = 60) {
-    if (!buttonOrLink) return;
-    const isButton = buttonOrLink.tagName === 'BUTTON';
-    const originalText = buttonOrLink.textContent;
-    buttonOrLink.disabled = true;
+// OTP cooldown helper – now properly disables both buttons and links
+function startOtpCooldown(element, seconds = 60) {
+    if (!element) return;
+    const isButton = element.tagName === 'BUTTON';
+    const originalText = element.textContent;
+    const originalColor = element.style.color || (isButton ? '' : '#ff5722'); // hyperlink default color
+
+    if (isButton) {
+        element.disabled = true;
+    } else {
+        element.style.pointerEvents = 'none';
+        element.style.color = '#aaa';
+    }
+
     let remaining = seconds;
+    element.textContent = `Resend OTP (${remaining}s)`;
+
     const interval = setInterval(() => {
         remaining--;
         if (remaining <= 0) {
             clearInterval(interval);
-            buttonOrLink.disabled = false;
-            buttonOrLink.textContent = originalText;
+            if (isButton) {
+                element.disabled = false;
+            } else {
+                element.style.pointerEvents = '';
+                element.style.color = originalColor;
+            }
+            element.textContent = originalText;
         } else {
-            buttonOrLink.textContent = `Resend OTP (${remaining}s)`;
+            element.textContent = `Resend OTP (${remaining}s)`;
         }
     }, 1000);
 }
@@ -258,7 +270,6 @@ function showForgotPasswordDialog(renderInPlace) {
                     <div style="text-align:center;margin-top:15px;">
                         <small style="color:#666;">Didn't receive it? </small>
                         <a class="hyperlink" id="resendOtpLink">Resend OTP</a>
-                        <span id="resendOtpTimer" style="color:#999;font-size:0.85rem;display:none;"></span>
                     </div>
                 </div>
                 <div id="forgotPasswordStep3" style="display:none;">
@@ -288,7 +299,7 @@ function showForgotPasswordDialog(renderInPlace) {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-	let currentUsername = '';
+    let currentUsername = '';
     let currentEmail = '';
     let currentOTP = '';
 
@@ -309,13 +320,10 @@ function showForgotPasswordDialog(renderInPlace) {
         }
 
         currentUsername = username;
-        // Immediately show Step 2
         document.getElementById('forgotPasswordStep1').style.display = 'none';
         document.getElementById('forgotPasswordStep2').style.display = 'block';
         document.getElementById('otpInput').focus();
-        // Start cooldown on Resend link
-        const resendLink = document.getElementById('resendOtpLink');
-        startOtpCooldown(resendLink, 60);
+        startOtpCooldown(document.getElementById('resendOtpLink'), 60);
 
         try {
             const result = await requestPasswordReset(username, '');
@@ -354,11 +362,11 @@ function showForgotPasswordDialog(renderInPlace) {
         }
     });
 
-    // Resend OTP (with cooldown already started)
+    // Resend OTP – already disabled during cooldown by startOtpCooldown
     document.getElementById('resendOtpLink').addEventListener('click', async () => {
-        const msgDiv = document.getElementById('forgotPasswordMessage');
         const resendLink = document.getElementById('resendOtpLink');
-        if (resendLink.disabled) return;
+        if (resendLink.style.pointerEvents === 'none') return; // cooldown active
+        const msgDiv = document.getElementById('forgotPasswordMessage');
         startOtpCooldown(resendLink, 60);
         try {
             const result = await resendOTP(currentUsername);
@@ -400,7 +408,6 @@ function showForgotPasswordDialog(renderInPlace) {
         }
     });
 
-    // Allow Enter key navigation through steps
     document.getElementById('resetUsername')?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') document.getElementById('requestResetBtn').click();
     });
@@ -501,13 +508,10 @@ export function renderAuthScreen(root, callbacks) {
             return;
         }
 
-        // Immediately show Step 2
         document.getElementById('registerStep1').style.display = 'none';
         document.getElementById('registerStep2').style.display = 'block';
         document.getElementById('regOtpInput').focus();
-        // Start cooldown on resend link
-        const resendLink = document.getElementById('regResendOtpLink');
-        startOtpCooldown(resendLink, 60);
+        startOtpCooldown(document.getElementById('regResendOtpLink'), 60);
 
         try {
             const result = await registerUser(username, email);
@@ -524,9 +528,9 @@ export function renderAuthScreen(root, callbacks) {
 
     // Resend OTP for registration
     document.getElementById('regResendOtpLink')?.addEventListener('click', async () => {
-        const msgDiv = document.getElementById('registerMessage');
         const resendLink = document.getElementById('regResendOtpLink');
-        if (resendLink.disabled) return;
+        if (resendLink.style.pointerEvents === 'none') return;
+        const msgDiv = document.getElementById('registerMessage');
         const username = document.getElementById('regUsername').value;
         startOtpCooldown(resendLink, 60);
         try {

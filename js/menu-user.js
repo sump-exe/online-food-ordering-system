@@ -192,7 +192,6 @@ export function attachCustomerEvents(callbacks) {
         });
     }
 
-    // Highlight the active category in the sidebar as the user scrolls
     const sections = document.querySelectorAll('.customer-menu-section');
     const categoryLinks = document.querySelectorAll('.customer-category-link');
 
@@ -203,7 +202,6 @@ export function attachCustomerEvents(callbacks) {
             });
         };
 
-        // Restore saved active category and scroll position (if any) immediately
         if (state.activeCustomerCategory) {
             setActive(state.activeCustomerCategory);
             window.scrollTo({ top: state.customerScrollPos, behavior: 'instant' });
@@ -486,21 +484,46 @@ async function saveAccountSettings(payload) {
     return apiPost('updateAccountSettings', payload);
 }
 
-// OTP cooldown helper (seconds)
-function startOtpCooldown(button, seconds = 60) {
-    if (!button) return;
-    button.disabled = true;
+// OTP cooldown helper – grays out and disables both buttons and links
+function startOtpCooldown(element, seconds = 60) {
+    if (!element) return;
+    const isButton = element.tagName === 'BUTTON';
+    const originalText = element.textContent;
+
+    // Save original button styles so we can restore them later
+    let originalBg, originalColor, originalCursor;
+    if (isButton) {
+        originalBg = element.style.background;
+        originalColor = element.style.color;
+        originalCursor = element.style.cursor;
+        element.style.background = '#d1d5db'; // light gray
+        element.style.color = '#6b7280';     // medium gray
+        element.style.cursor = 'not-allowed';
+        element.disabled = true;
+    } else {
+        element.style.pointerEvents = 'none';
+        element.style.color = '#aaa';
+    }
+
     let remaining = seconds;
-    const originalText = button.textContent;
-    button.textContent = `Resend OTP (${remaining}s)`;
+    element.textContent = `Resend OTP (${remaining}s)`;
+
     const interval = setInterval(() => {
         remaining--;
         if (remaining <= 0) {
             clearInterval(interval);
-            button.disabled = false;
-            button.textContent = originalText;
+            if (isButton) {
+                element.disabled = false;
+                element.style.background = originalBg;
+                element.style.color = originalColor;
+                element.style.cursor = originalCursor;
+            } else {
+                element.style.pointerEvents = '';
+                element.style.color = '#ff5722'; // original hyperlink orange
+            }
+            element.textContent = originalText;
         } else {
-            button.textContent = `Resend OTP (${remaining}s)`;
+            element.textContent = `Resend OTP (${remaining}s)`;
         }
     }, 1000);
 }
@@ -603,7 +626,7 @@ async function openAccountSettingsDrawer(renderInPlace) {
     const passwordOtpMsg = document.getElementById('passwordOtpMessage');
     const sendPasswordOtpBtn = document.getElementById('sendPasswordOtpBtn');
 
-    // --- Send OTP for password change ---
+    // --- Send OTP for password change (button cooldown) ---
     sendPasswordOtpBtn?.addEventListener('click', async () => {
         const currentPwd = document.getElementById('accountCurrentPassword').value;
         const newPwd = document.getElementById('accountNewPassword').value;
@@ -629,7 +652,7 @@ async function openAccountSettingsDrawer(renderInPlace) {
         }
     });
 
-    // --- Save changes (with subtle loading indicator) ---
+    // --- Save changes ---
     document.getElementById('saveAccountSettingsBtn')?.addEventListener('click', async () => {
         msgDiv.innerHTML = '';
         const payload = {
@@ -641,7 +664,6 @@ async function openAccountSettingsDrawer(renderInPlace) {
             confirmPassword: document.getElementById('accountConfirmPassword')?.value || '',
         };
 
-        // If new password is being changed, require OTP
         if (payload.newPassword) {
             const otp = document.getElementById('accountOtpPassword')?.value.trim();
             if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
@@ -651,7 +673,6 @@ async function openAccountSettingsDrawer(renderInPlace) {
             payload.otp = otp;
         }
 
-        // Show subtle loading message
         msgDiv.innerHTML = '<div style="text-align:center;padding:10px;color:#999;">Updating password…</div>';
 
         try {
@@ -667,7 +688,7 @@ async function openAccountSettingsDrawer(renderInPlace) {
         }
     });
 
-    // --- Account deletion flow ---
+    // --- Account deletion flow (button cooldown) ---
     const initiateBtn = document.getElementById('initiateDeleteBtn');
     const confirmForm = document.getElementById('deleteConfirmationForm');
     const sendDeleteOtpBtn = document.getElementById('sendDeleteOtpBtn');
