@@ -3,6 +3,15 @@ import { state } from './state.js';
 
 const logoUrl = new URL('../img/logo.png', import.meta.url).href;
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function normalizeOtpInput(value) {
     const digitsOnly = String(value ?? '').replace(/\D/g, '');
     if (digitsOnly.length === 0 || digitsOnly.length > 6) {
@@ -11,7 +20,23 @@ function normalizeOtpInput(value) {
     return digitsOnly.padStart(6, '0');
 }
 
+function clearAuthMessage() {
+    state.authMessage = null;
+}
+
+function resetSessionState() {
+    state.currentUser = null;
+    state.customerCart = [];
+    state.currentPage = 'login';
+    state.adminPage = 'menu';
+    state.firstLoad = true;
+    state.currentResetToken = null;
+    state.currentResetUsername = null;
+    state.isOrderHistoryOpen = false;
+}
+
 export async function login(username, password) {
+    clearAuthMessage();
     const data = await apiGet('login', { username, password });
     if (data.user) {
         state.currentUser = data.user;
@@ -25,14 +50,17 @@ export function logout(renderApp) {
         return;
     }
 
-    state.currentUser = null;
-    state.customerCart = [];
-    state.currentPage = 'login';
-    state.adminPage = 'menu';
-    state.firstLoad = true;
-    state.currentResetToken = null;
-    state.currentResetUsername = null;
-    state.isOrderHistoryOpen = false;
+    clearAuthMessage();
+    resetSessionState();
+    renderApp();
+}
+
+export function logoutDueToInactivity(renderApp) {
+    resetSessionState();
+    state.authMessage = {
+        type: 'error',
+        text: 'You have been logged out due to inactivity.'
+    };
     renderApp();
 }
 
@@ -88,11 +116,13 @@ export async function deleteAccount(customerId, password, otp = '') {
 }
 
 export function showRegisterPage(renderInPlace) {
+    clearAuthMessage();
     state.currentPage = 'register';
     renderInPlace();
 }
 
 export function showLoginPage(renderInPlace) {
+    clearAuthMessage();
     state.currentPage = 'login';
     state.currentResetToken = null;
     state.currentResetUsername = null;
@@ -100,13 +130,17 @@ export function showLoginPage(renderInPlace) {
 }
 
 function renderLogin() {
+    const authMessageHtml = state.authMessage
+        ? `<div class="${state.authMessage.type === 'success' ? 'success-message' : 'error-message'}">${escapeHtml(state.authMessage.text)}</div>`
+        : '';
+
     return `
     <div class="glass-card" style="max-width:500px;margin:60px auto;padding:40px;">
         <div style="text-align:center;margin-bottom:30px;">
             <img src="${logoUrl}" alt="FoodieDash" style="max-width:220px;width:100%;height:auto;display:block;margin:0 auto 12px;">
             <p style="color:#666;">Online Food Ordering System</p>
         </div>
-        <div id="loginMessage"></div>
+        <div id="loginMessage">${authMessageHtml}</div>
         <div class="form-group"><label>Username</label><input type="text" id="loginUsername" placeholder="Enter your username"></div>
         <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="Enter your password"></div>
         <button id="doLoginBtn" class="btn-primary" style="width:100%;padding:14px;">Sign In</button>
@@ -465,6 +499,9 @@ export function renderAuthScreen(root, callbacks) {
             const username = document.getElementById('loginUsername').value;
             const password = document.getElementById('loginPassword').value;
             const msgDiv = document.getElementById('loginMessage');
+
+            clearAuthMessage();
+            msgDiv.innerHTML = '';
 
             try {
                 const ok = await login(username, password);

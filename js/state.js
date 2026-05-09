@@ -1,5 +1,6 @@
 export const state = {
     currentUser: null,
+    authMessage: null,
     customerCart: [],
     currentPage: 'login',
     adminPage: 'menu',

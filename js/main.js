@@ -2,7 +2,8 @@
 // File: js/main.js
 // ============================================================
 import { state } from './state.js';
-import { checkForResetToken, logout, renderAuthScreen } from './login.js';
+import { checkForResetToken, logout, logoutDueToInactivity, renderAuthScreen } from './login.js';
+import { startInactivityMonitor, stopInactivityMonitor } from './inactivity-manager.js';
 import {
     attachAdminMenuInventoryEvents,
     loadCategories as loadFoodCategories,
@@ -42,6 +43,27 @@ import {
 
 function getRoot() {
     return document.getElementById('app');
+}
+
+function getCurrentSessionKey() {
+    if (!state.currentUser) {
+        return null;
+    }
+
+    return `${state.currentUser.role}:${state.currentUser.userID}`;
+}
+
+function syncInactivityMonitor() {
+    const sessionKey = getCurrentSessionKey();
+
+    if (!sessionKey) {
+        stopInactivityMonitor();
+        return;
+    }
+
+    startInactivityMonitor(sessionKey, () => {
+        logoutDueToInactivity(renderApp);
+    });
 }
 
 export function setAdminPage(page) {
@@ -117,6 +139,8 @@ function renderAdminLayout() {
 }
 
 export function renderInPlace() {
+    syncInactivityMonitor();
+
     const root = getRoot();
     if (!root) {
         return;
@@ -210,6 +234,8 @@ export function renderInPlace() {
 }
 
 export async function renderApp() {
+    syncInactivityMonitor();
+
     const root = getRoot();
     if (!root) {
         return;
@@ -219,6 +245,8 @@ export async function renderApp() {
         renderInPlace();
         return;
     }
+
+    const sessionKey = getCurrentSessionKey();
 
     if (state.firstLoad) {
         root.innerHTML = '<div style="text-align:center;padding:60px;color:#999;">Loading...</div>';
@@ -249,10 +277,15 @@ export async function renderApp() {
         }
     } catch (error) {
         console.error('Customer data load warning:', error);
-        if (state.currentUser.role !== 'admin') {
+        if (!state.currentUser || state.currentUser.role !== 'admin') {
             state.menuItems = [];
             state.orders = [];
         }
+    }
+
+    if (!state.currentUser || getCurrentSessionKey() !== sessionKey) {
+        renderInPlace();
+        return;
     }
 
     state.firstLoad = false;
