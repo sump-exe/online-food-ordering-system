@@ -1,6 +1,40 @@
 <?php
+// ============================================================
+// File: api/sales-report-admin.php (replaces old file)
+// ============================================================
 
 $adminSalesReportActions = [
+    // New: Get all completed orders with receipt info for sales report
+    'getSalesOrders' => function ($conn, $body) {
+        $sql = "
+            SELECT 
+                o.OrderID,
+                o.order_date,
+                o.TotalPayment,
+                c.username AS customer_name,
+                COALESCE(r.receipt_number, 'N/A') AS receipt_number
+            FROM orders o
+            LEFT JOIN customers c ON c.customerID = o.customerID
+            LEFT JOIN payments p ON p.OrderID = o.OrderID
+            LEFT JOIN receipts r ON r.receipt_id = p.receipt_id
+            WHERE o.Status = 'Complete'
+            ORDER BY o.order_date DESC
+        ";
+        $result = $conn->query($sql);
+        $orders = [];
+        while ($row = $result->fetch_assoc()) {
+            $orders[] = [
+                'orderID' => (int)$row['OrderID'],
+                'receipt_number' => $row['receipt_number'],
+                'order_date' => $row['order_date'],
+                'customer_name' => $row['customer_name'] ?? 'Guest',
+                'total_payment' => (int)$row['TotalPayment'],
+            ];
+        }
+        respond($orders);
+    },
+    
+    // Keep old methods for backwards compatibility if needed, but not used in new UI
     'getSalesReport' => function ($conn, $body) {
         $period = $_GET['period'] ?? 'monthly';
         $startDate = $_GET['startDate'] ?? null;

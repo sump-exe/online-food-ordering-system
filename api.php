@@ -1,4 +1,7 @@
 <?php
+// ============================================================
+// File: api/api.php (updated with new routes)
+// ============================================================
 
 require __DIR__ . '/api/bootstrap.php';
 require __DIR__ . '/api/login.php';
@@ -85,6 +88,9 @@ $actionMap = [
     'getSalesByDate' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByDate'],
     'getSalesByCustomer' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByCustomer'],
     'getMostOrderedItem' => ['group' => 'sales_report_admin', 'handler' => 'getMostOrderedItem'],
+    
+    // NEW: Sales orders list for updated report
+    'getSalesOrders' => ['group' => 'sales_report_admin', 'handler' => 'getSalesOrders'],
 
     // Admin Users Management
     'getUsers' => ['group' => 'users_management_admin', 'handler' => 'getUsers'],

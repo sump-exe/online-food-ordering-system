@@ -20,8 +20,10 @@ import { loadUserOrders } from './order-history-user.js';
 import { attachCustomerEvents, renderCustomerPage } from './menu-user.js';
 import {
     loadCategories as loadAdminCategories,
+    renderAdminCategoriesPage,
     renderDeletedCategoriesSection,
     attachCategoryEvents,
+    attachTrashEvents,
     loadDeletedCategories,
 } from './category-management-admin.js';
 import {

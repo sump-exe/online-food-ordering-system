@@ -1,4 +1,7 @@
 <?php
+// ============================================================
+// File: api/order-history-admin.php (added getOrderDetails)
+// ============================================================
 
 $adminOrderHistoryActions = [
     'getAllOrders' => function ($conn, $body) {
@@ -40,5 +43,34 @@ $adminOrderHistoryActions = [
 
         respondSuccess();
     },
-];
+    // New: get detailed order items for a specific order
+    'getOrderDetails' => function ($conn, $body) {
+        $orderId = (int)($_GET['orderId'] ?? 0);
+        if ($orderId <= 0) {
+            respondError('Invalid order ID.');
+        }
 
+        $stmt = $conn->prepare("
+            SELECT oi.ItemID, oi.quantity, oi.price, m.name as item_name
+            FROM orderitems oi
+            JOIN menu_items m ON m.itemID = oi.ItemID
+            WHERE oi.OrderID = ?
+        ");
+        $stmt->bind_param('i', $orderId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $items = [];
+        while ($row = $result->fetch_assoc()) {
+            $items[] = [
+                'itemID' => (int)$row['ItemID'],
+                'item_name' => $row['item_name'],
+                'quantity' => (int)$row['quantity'],
+                'price' => (int)$row['price'],
+                'subtotal' => (int)$row['price'] * (int)$row['quantity']
+            ];
+        }
+        $stmt->close();
+
+        respond($items);
+    },
+];
