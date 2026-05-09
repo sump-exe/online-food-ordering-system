@@ -55,9 +55,15 @@ export function renderAdminNavBar() {
 }
 
 export function renderAdminMenuPage() {
-    const rowsHtml = state.menuItems.map((item) => `
+    const rowsHtml = state.menuItems.map((item) => {
+        const tagsHtml = (item.tags && item.tags.length > 0) ?
+            `<div class="item-tags">${item.tags.map(t => `<span class="tag-badge">${escapeHtml(t.tag_name)}</span>`).join('')}</div>` : '';
+        return `
         <tr>
-            <td><strong>${escapeHtml(item.name)}</strong></td>
+            <td>
+                <strong>${escapeHtml(item.name)}</strong>
+                ${tagsHtml}
+            </td>
             <td>${item.category_name || '-'}</td>
             <td>${item.stock}</td>
             <td>P${(item.price / 100).toFixed(2)}</td>
@@ -69,14 +75,43 @@ export function renderAdminMenuPage() {
                     🗑️ Delete
                 </button>
             </td>
-         `
-    ).join('');
+        </tr>`;
+    }).join('');
 
     const categoryOptions = (state.categories || []).map((category) => (
         `<option value="${category.categoryID}">${escapeHtml(category.name)}</option>`
     )).join('');
 
+    // Build tag checkboxes HTML
+    const tagsCheckboxes = (state.tags || []).map(tag => `
+        <label style="margin-right:12px; cursor:pointer; display:inline-block;">
+            <input type="checkbox" name="itemTags" value="${tag.tagID}" style="margin-right:4px;">${escapeHtml(tag.tag_name)}
+        </label>
+    `).join('');
+
     return `
+    <style>
+        .tag-badge {
+            display: inline-block;
+            background: #e8f0fe;
+            color: #1a73e8;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            margin-right: 4px;
+            margin-top: 2px;
+            font-weight: 600;
+        }
+        .item-tags {
+            margin-top: 4px;
+        }
+        .tag-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 4px;
+        }
+    </style>
     <div class="admin-page-content">
         <div class="page-header">
             <h1>Menu &amp; Inventory Management</h1>
@@ -103,6 +138,10 @@ export function renderAdminMenuPage() {
                 </div>
                 <button id="addItemBtn" class="btn-primary" style="padding:12px 24px;white-space:nowrap;">Add Item</button>
             </div>
+            <div class="form-group" style="margin-top:16px;">
+                <label>Tags (optional)</label>
+                <div id="addItemTags" class="tag-checkboxes">${tagsCheckboxes || '<span style="color:#999;">No tags available</span>'}</div>
+            </div>
         </div>
         <div class="panel">
             <h2>Stock Overview</h2>
@@ -125,7 +164,7 @@ export function renderAdminMenuPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${rowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No items found. </td></tr>'}
+                        ${rowsHtml || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">No items found.</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -171,6 +210,11 @@ function getEditModalHtml(categoryOptions) {
                     </div>
                     
                     <div class="form-group">
+                        <label>Tags (optional)</label>
+                        <div id="editItemTags" class="tag-checkboxes"></div>
+                    </div>
+                    
+                    <div class="form-group">
                         <label>Current Image</label>
                         <div id="currentImageContainer" style="background: #f9f5f0; border-radius: 12px; padding: 12px; text-align: center;">
                             <p style="color: #999;">No image uploaded</p>
@@ -192,9 +236,7 @@ function getEditModalHtml(categoryOptions) {
     </div>`;
 }
 
-// Updated modal with unique ID
 function showDeleteMenuItemConfirmModal(itemId, itemName, onConfirm) {
-    // Remove any existing delete menu item modal first
     const existing = document.getElementById('deleteMenuItemConfirmModal');
     if (existing) existing.remove();
 
@@ -220,9 +262,7 @@ function showDeleteMenuItemConfirmModal(itemId, itemName, onConfirm) {
     
     const modal = document.getElementById('deleteMenuItemConfirmModal');
     
-    const closeModal = () => {
-        modal.remove();
-    };
+    const closeModal = () => { modal.remove(); };
     
     document.getElementById('closeDeleteModalBtn').addEventListener('click', closeModal);
     document.getElementById('cancelDeleteBtn').addEventListener('click', closeModal);
@@ -231,9 +271,7 @@ function showDeleteMenuItemConfirmModal(itemId, itemName, onConfirm) {
         onConfirm();
     });
     
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 }
 
 async function addMenuItem(payload) {
@@ -251,10 +289,6 @@ async function updateMenuItem(formData) {
     }).then(res => res.json());
 }
 
-async function deleteMenuItem(itemId) {
-    return await apiPost('deleteMenuItem', { itemId });
-}
-
 function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -267,10 +301,7 @@ function escapeHtml(str) {
 
 async function showEditModal(itemId, categoryOptions, onSaveSuccess) {
     const modal = document.getElementById('editItemModal');
-    if (!modal) {
-        console.error('Modal not found');
-        return;
-    }
+    if (!modal) { console.error('Modal not found'); return; }
     
     const messageDiv = document.getElementById('modalMessage');
     messageDiv.textContent = 'Loading item data...';
@@ -288,10 +319,34 @@ async function showEditModal(itemId, categoryOptions, onSaveSuccess) {
         document.getElementById('editItemStock').value = item.stock;
         document.getElementById('editItemCategory').value = item.categoryID || 0;
         
+        // Render tags checkboxes
+        const tagsContainer = document.getElementById('editItemTags');
+        tagsContainer.innerHTML = '';
+        const allTags = state.tags || [];
+        const itemTagIds = (item.tags || []).map(t => t.tagID);
+        allTags.forEach(tag => {
+            const label = document.createElement('label');
+            label.style.marginRight = '12px';
+            label.style.cursor = 'pointer';
+            label.style.display = 'inline-block';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.name = 'editItemTags';
+            cb.value = tag.tagID;
+            if (itemTagIds.includes(tag.tagID)) cb.checked = true;
+            cb.style.marginRight = '4px';
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(escapeHtml(tag.tag_name)));
+            tagsContainer.appendChild(label);
+        });
+        if (allTags.length === 0) {
+            tagsContainer.innerHTML = '<span style="color:#999;">No tags available</span>';
+        }
+        
         const imageContainer = document.getElementById('currentImageContainer');
         if (item.image) {
             imageContainer.innerHTML = `
-                <img src="../${item.image}" alt="${item.name}" style="max-width: 150px; max-height: 150px; border-radius: 12px; border: 1px solid #ffe0c4;">
+                <img src="../${item.image}" alt="${escapeHtml(item.name)}" style="max-width: 150px; max-height: 150px; border-radius: 12px; border: 1px solid #ffe0c4;">
                 <p style="font-size: 0.75rem; color: #666; margin-top: 8px;">Current image</p>
             `;
         } else {
@@ -310,9 +365,7 @@ async function showEditModal(itemId, categoryOptions, onSaveSuccess) {
 
 function closeEditModal() {
     const modal = document.getElementById('editItemModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
+    if (modal) { modal.style.display = 'none'; }
     const form = document.getElementById('editItemForm');
     if (form) form.reset();
     const messageDiv = document.getElementById('modalMessage');
@@ -331,14 +384,10 @@ export function attachAdminMenuInventoryEvents(callbacks) {
     }
     
     const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => logout(renderApp));
-    }
+    if (logoutBtn) { logoutBtn.addEventListener('click', () => logout(renderApp)); }
     
     document.querySelectorAll('.admin-nav-item').forEach((btn) => {
-        btn.addEventListener('click', function () {
-            setAdminPage(this.dataset.page);
-        });
+        btn.addEventListener('click', function () { setAdminPage(this.dataset.page); });
     });
     
     document.addEventListener('click', async function(e) {
@@ -354,29 +403,23 @@ export function attachAdminMenuInventoryEvents(callbacks) {
         if (deleteBtn) {
             const itemId = parseInt(deleteBtn.dataset.id, 10);
             const itemName = deleteBtn.dataset.name;
-            // Use the renamed modal function
             showDeleteMenuItemConfirmModal(itemId, itemName, async () => {
                 try {
-                    await deleteMenuItem(itemId);
+                    await apiPost('deleteMenuItem', { itemId });
                     await renderApp();
-                } catch (error) {
-                    alert('Failed to move item to trash: ' + error.message);
-                }
+                } catch (error) { alert('Failed to move item to trash: ' + error.message); }
             });
         }
     });
     
     const closeModalBtn = document.getElementById('closeModalBtn');
     const cancelModalBtn = document.getElementById('cancelModalBtn');
-    
     if (closeModalBtn) closeModalBtn.addEventListener('click', closeEditModal);
     if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeEditModal);
     
     const modal = document.getElementById('editItemModal');
     if (modal) {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeEditModal();
-        });
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeEditModal(); });
     }
     
     const saveBtn = document.getElementById('saveItemBtn');
@@ -396,20 +439,23 @@ export function attachAdminMenuInventoryEvents(callbacks) {
                 messageDiv.style.display = 'block';
                 return;
             }
-            
             if (isNaN(price) || price <= 0) {
                 messageDiv.textContent = 'Price must be a positive number.';
                 messageDiv.className = 'modal-message error';
                 messageDiv.style.display = 'block';
                 return;
             }
-            
             if (isNaN(stock) || stock < 0) {
                 messageDiv.textContent = 'Stock cannot be negative.';
                 messageDiv.className = 'modal-message error';
                 messageDiv.style.display = 'block';
                 return;
             }
+            
+            // Gather selected tag IDs
+            const tagCheckboxes = document.querySelectorAll('#editItemTags input[name="editItemTags"]:checked');
+            const tagIds = Array.from(tagCheckboxes).map(cb => parseInt(cb.value, 10));
+            formData.append('tags', JSON.stringify(tagIds));
             
             messageDiv.textContent = 'Saving...';
             messageDiv.className = 'modal-message';
@@ -420,21 +466,11 @@ export function attachAdminMenuInventoryEvents(callbacks) {
                     method: 'POST',
                     body: formData
                 });
-                
                 const result = await response.json();
-                
-                if (result.error) {
-                    throw new Error(result.error);
-                }
-                
+                if (result.error) { throw new Error(result.error); }
                 messageDiv.textContent = result.message || 'Item updated successfully!';
                 messageDiv.className = 'modal-message success';
-                
-                setTimeout(() => {
-                    closeEditModal();
-                    renderApp();
-                }, 1500);
-                
+                setTimeout(() => { closeEditModal(); renderApp(); }, 1500);
             } catch (error) {
                 console.error('Save error:', error);
                 messageDiv.textContent = 'Error: ' + error.message;
@@ -451,13 +487,17 @@ export function attachAdminMenuInventoryEvents(callbacks) {
             const price = parseInt(document.getElementById('newItemPrice').value, 10);
             const stock = parseInt(document.getElementById('newItemStock').value, 10);
             const categoryID = parseInt(document.getElementById('newItemCategory').value, 10);
-
+            
             if (!name || isNaN(price) || isNaN(stock)) {
                 alert('Please fill all fields');
                 return;
             }
-
-            addMenuItem({ name, price, stock, categoryID })
+            
+            // Collect tag IDs from add form
+            const addTagCheckboxes = document.querySelectorAll('#addItemTags input[name="itemTags"]:checked');
+            const tagIds = Array.from(addTagCheckboxes).map(cb => parseInt(cb.value, 10));
+            
+            addMenuItem({ name, price, stock, categoryID, tags: tagIds })
                 .then(() => renderApp())
                 .catch((error) => alert(error.message));
         });
@@ -518,9 +558,7 @@ export function attachTrashItemEvents(callbacks) {
                 alert(result.message);
                 if (refreshDeletedItems) await refreshDeletedItems();
                 if (renderApp) await renderApp();
-            } catch (error) {
-                alert(error.message);
-            }
+            } catch (error) { alert(error.message); }
         });
     });
 
@@ -534,9 +572,7 @@ export function attachTrashItemEvents(callbacks) {
                 alert(result.message);
                 if (refreshDeletedItems) await refreshDeletedItems();
                 if (renderApp) await renderApp();
-            } catch (error) {
-                alert(error.message);
-            }
+            } catch (error) { alert(error.message); }
         });
     });
 }

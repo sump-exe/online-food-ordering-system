@@ -10,9 +10,33 @@ export async function loadUserMenuData(loadMenuItems, loadUserOrders) {
 export function renderCustomerPage() {
     const searchTerm = state.customerMenuSearch.trim().toLowerCase();
     const categoryMap = {};
+
+    // Build a lookup so we can always get a category name, even if item.category_name is missing
+    const categoryById = {};
+    for (const cat of state.categories) {
+        categoryById[cat.categoryID] = (cat.name || '').toLowerCase();
+    }
+
     for (const item of state.menuItems) {
-        if (searchTerm && !String(item.name || '').toLowerCase().includes(searchTerm)) {
-            continue;
+        // Apply search filter
+        if (searchTerm) {
+            // item name
+            const name = String(item.name || '').toLowerCase();
+            // category name – try the joined field first, then look up by ID
+            let catName = String(item.category_name || '').toLowerCase();
+            if (!catName && item.categoryID && categoryById[item.categoryID]) {
+                catName = categoryById[item.categoryID];
+            }
+            // tags
+            const tags = (item.tags || []).map(t => String(t.tag_name || '').toLowerCase());
+
+            const nameMatch = name.includes(searchTerm);
+            const catMatch = catName.includes(searchTerm);
+            const tagMatch = tags.some(t => t.includes(searchTerm));
+
+            if (!nameMatch && !catMatch && !tagMatch) {
+                continue; // skip this item
+            }
         }
 
         const category = item.category_name || 'Other';
@@ -138,7 +162,7 @@ export function renderCustomerPage() {
                 <input
                     type="text"
                     id="customerMenuSearch"
-                    placeholder="Search for a menu item"
+                    placeholder="Search by name, category, or tag"
                     value="${escapeHtml(state.customerMenuSearch)}"
                 >
             </div>
@@ -308,6 +332,7 @@ export function attachCustomerEvents(callbacks) {
     });
 }
 
+// ---------- Cart, Order History, Account Settings (unchanged) ----------
 function openCartDrawer(renderInPlace, renderApp) {
     const existingDrawer = document.getElementById('cartDrawer');
     const existingOverlay = document.getElementById('cartOverlay');
@@ -484,46 +509,20 @@ async function saveAccountSettings(payload) {
     return apiPost('updateAccountSettings', payload);
 }
 
-// OTP cooldown helper – grays out and disables both buttons and links
-function startOtpCooldown(element, seconds = 60) {
-    if (!element) return;
-    const isButton = element.tagName === 'BUTTON';
-    const originalText = element.textContent;
-
-    // Save original button styles so we can restore them later
-    let originalBg, originalColor, originalCursor;
-    if (isButton) {
-        originalBg = element.style.background;
-        originalColor = element.style.color;
-        originalCursor = element.style.cursor;
-        element.style.background = '#d1d5db'; // light gray
-        element.style.color = '#6b7280';     // medium gray
-        element.style.cursor = 'not-allowed';
-        element.disabled = true;
-    } else {
-        element.style.pointerEvents = 'none';
-        element.style.color = '#aaa';
-    }
-
+function startOtpCooldown(button, seconds = 60) {
+    if (!button) return;
+    button.disabled = true;
     let remaining = seconds;
-    element.textContent = `Resend OTP (${remaining}s)`;
-
+    const originalText = button.textContent;
+    button.textContent = `Resend OTP (${remaining}s)`;
     const interval = setInterval(() => {
         remaining--;
         if (remaining <= 0) {
             clearInterval(interval);
-            if (isButton) {
-                element.disabled = false;
-                element.style.background = originalBg;
-                element.style.color = originalColor;
-                element.style.cursor = originalCursor;
-            } else {
-                element.style.pointerEvents = '';
-                element.style.color = '#ff5722'; // original hyperlink orange
-            }
-            element.textContent = originalText;
+            button.disabled = false;
+            button.textContent = originalText;
         } else {
-            element.textContent = `Resend OTP (${remaining}s)`;
+            button.textContent = `Resend OTP (${remaining}s)`;
         }
     }, 1000);
 }
@@ -626,7 +625,6 @@ async function openAccountSettingsDrawer(renderInPlace) {
     const passwordOtpMsg = document.getElementById('passwordOtpMessage');
     const sendPasswordOtpBtn = document.getElementById('sendPasswordOtpBtn');
 
-    // --- Send OTP for password change (button cooldown) ---
     sendPasswordOtpBtn?.addEventListener('click', async () => {
         const currentPwd = document.getElementById('accountCurrentPassword').value;
         const newPwd = document.getElementById('accountNewPassword').value;
@@ -652,7 +650,6 @@ async function openAccountSettingsDrawer(renderInPlace) {
         }
     });
 
-    // --- Save changes ---
     document.getElementById('saveAccountSettingsBtn')?.addEventListener('click', async () => {
         msgDiv.innerHTML = '';
         const payload = {
@@ -688,7 +685,6 @@ async function openAccountSettingsDrawer(renderInPlace) {
         }
     });
 
-    // --- Account deletion flow (button cooldown) ---
     const initiateBtn = document.getElementById('initiateDeleteBtn');
     const confirmForm = document.getElementById('deleteConfirmationForm');
     const sendDeleteOtpBtn = document.getElementById('sendDeleteOtpBtn');

@@ -23,6 +23,34 @@ $userMenuActions = [
         }
         unset($item);
 
+        // Attach only visible tags for each item
+        if (!empty($items)) {
+            $itemIds = array_column($items, 'itemID');
+            $placeholders = implode(',', array_fill(0, count($itemIds), '?'));
+            $types = str_repeat('i', count($itemIds));
+            $tagStmt = $conn->prepare("
+                SELECT ta.itemID, t.tagID, t.tag_name
+                FROM tag_assignments ta
+                JOIN tags t ON t.tagID = ta.tagID AND t.is_visible = 1
+                WHERE ta.itemID IN ($placeholders)
+            ");
+            $tagStmt->bind_param($types, ...$itemIds);
+            $tagStmt->execute();
+            $tagRes = $tagStmt->get_result();
+            $tagMap = [];
+            while ($row = $tagRes->fetch_assoc()) {
+                $tagMap[(int)$row['itemID']][] = [
+                    'tagID' => (int)$row['tagID'],
+                    'tag_name' => $row['tag_name']
+                ];
+            }
+            $tagStmt->close();
+            foreach ($items as &$item) {
+                $item['tags'] = $tagMap[$item['itemID']] ?? [];
+            }
+            unset($item);
+        }
+
         respond($items);
     },
     'getCategories' => function ($conn, $body) {

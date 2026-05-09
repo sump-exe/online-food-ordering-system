@@ -1,10 +1,9 @@
 <?php
 
 $adminTagsActions = [
-    // Get all tags
     'getTags' => function ($conn, $body) {
         $result = $conn->query("
-            SELECT t.tagID, t.tag_name,
+            SELECT t.tagID, t.tag_name, t.is_visible,
                    COUNT(ta.itemID) as usage_count
             FROM tags t
             LEFT JOIN tag_assignments ta ON ta.tagID = t.tagID
@@ -17,13 +16,13 @@ $adminTagsActions = [
             $tags[] = [
                 'tagID' => (int)$row['tagID'],
                 'tag_name' => $row['tag_name'],
+                'is_visible' => (bool)$row['is_visible'],
                 'usage_count' => (int)$row['usage_count']
             ];
         }
         respond($tags);
     },
     
-    // Add new tag
     'addTag' => function ($conn, $body) {
         $tagName = trim($body['tag_name'] ?? '');
         
@@ -31,7 +30,6 @@ $adminTagsActions = [
             respondError('Tag name is required.');
         }
         
-        // Check for duplicate
         $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ?");
         $check->bind_param('s', $tagName);
         $check->execute();
@@ -42,7 +40,7 @@ $adminTagsActions = [
         }
         $check->close();
         
-        $stmt = $conn->prepare("INSERT INTO tags (tag_name) VALUES (?)");
+        $stmt = $conn->prepare("INSERT INTO tags (tag_name, is_visible) VALUES (?, 1)");
         $stmt->bind_param('s', $tagName);
         
         if (!$stmt->execute()) {
@@ -57,11 +55,11 @@ $adminTagsActions = [
             'success' => true,
             'tagID' => $newId,
             'tag_name' => $tagName,
+            'is_visible' => true,
             'message' => 'Tag added successfully'
         ]);
     },
     
-    // Update tag
     'updateTag' => function ($conn, $body) {
         $tagId = (int)($body['tagID'] ?? 0);
         $tagName = trim($body['tag_name'] ?? '');
@@ -69,12 +67,10 @@ $adminTagsActions = [
         if ($tagId <= 0) {
             respondError('Invalid tag ID.');
         }
-        
         if (empty($tagName)) {
             respondError('Tag name is required.');
         }
         
-        // Check for duplicate (excluding current tag)
         $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ? AND tagID != ?");
         $check->bind_param('si', $tagName, $tagId);
         $check->execute();
@@ -87,12 +83,10 @@ $adminTagsActions = [
         
         $stmt = $conn->prepare("UPDATE tags SET tag_name = ? WHERE tagID = ?");
         $stmt->bind_param('si', $tagName, $tagId);
-        
         if (!$stmt->execute()) {
             $stmt->close();
             respondError('Failed to update tag: ' . $conn->error);
         }
-        
         $stmt->close();
         
         respond([
@@ -101,7 +95,32 @@ $adminTagsActions = [
         ]);
     },
     
-    // Delete tag
+    'updateTagVisibility' => function ($conn, $body) {
+        $tagId = (int)($body['tagID'] ?? 0);
+        $isVisible = $body['is_visible'] ?? null;
+        
+        if ($tagId <= 0) {
+            respondError('Invalid tag ID.');
+        }
+        if ($isVisible === null) {
+            respondError('Visibility value is required.');
+        }
+        $visible = $isVisible ? 1 : 0;
+        
+        $stmt = $conn->prepare("UPDATE tags SET is_visible = ? WHERE tagID = ?");
+        $stmt->bind_param('ii', $visible, $tagId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            respondError('Failed to update visibility: ' . $conn->error);
+        }
+        $stmt->close();
+        
+        respond([
+            'success' => true,
+            'message' => 'Visibility updated.'
+        ]);
+    },
+    
     'deleteTag' => function ($conn, $body) {
         $tagId = (int)($body['tagID'] ?? 0);
         
@@ -109,7 +128,6 @@ $adminTagsActions = [
             respondError('Invalid tag ID.');
         }
         
-        // Check if tag is assigned to any menu items
         $check = $conn->prepare("SELECT COUNT(*) as count FROM tag_assignments WHERE tagID = ?");
         $check->bind_param('i', $tagId);
         $check->execute();
@@ -122,21 +140,17 @@ $adminTagsActions = [
             $message = " Tag was removed from {$row['count']} menu item(s).";
         }
         
-        // Delete tag assignments first
         $delAssign = $conn->prepare("DELETE FROM tag_assignments WHERE tagID = ?");
         $delAssign->bind_param('i', $tagId);
         $delAssign->execute();
         $delAssign->close();
         
-        // Delete tag
         $stmt = $conn->prepare("DELETE FROM tags WHERE tagID = ?");
         $stmt->bind_param('i', $tagId);
-        
         if (!$stmt->execute()) {
             $stmt->close();
             respondError('Failed to delete tag: ' . $conn->error);
         }
-        
         $stmt->close();
         
         respond([
@@ -146,7 +160,6 @@ $adminTagsActions = [
         ]);
     },
     
-    // Get tag by ID
     'getTagById' => function ($conn, $body) {
         $tagId = (int)($_GET['tagID'] ?? 0);
         
@@ -154,7 +167,7 @@ $adminTagsActions = [
             respondError('Invalid tag ID.');
         }
         
-        $stmt = $conn->prepare("SELECT tagID, tag_name FROM tags WHERE tagID = ?");
+        $stmt = $conn->prepare("SELECT tagID, tag_name, is_visible FROM tags WHERE tagID = ?");
         $stmt->bind_param('i', $tagId);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -167,7 +180,8 @@ $adminTagsActions = [
         
         respond([
             'tagID' => (int)$tag['tagID'],
-            'tag_name' => $tag['tag_name']
+            'tag_name' => $tag['tag_name'],
+            'is_visible' => (bool)$tag['is_visible']
         ]);
     }
 ];
