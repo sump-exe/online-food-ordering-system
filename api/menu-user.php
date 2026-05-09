@@ -28,10 +28,13 @@ $userMenuActions = [
             $itemIds = array_column($items, 'itemID');
             $placeholders = implode(',', array_fill(0, count($itemIds), '?'));
             $types = str_repeat('i', count($itemIds));
+            $tagJoin = hasTableColumn($conn, 'tags', 'is_visible')
+                ? 'JOIN tags t ON t.tagID = ta.tagID AND t.is_visible = 1'
+                : 'JOIN tags t ON t.tagID = ta.tagID';
             $tagStmt = $conn->prepare("
                 SELECT ta.itemID, t.tagID, t.tag_name
                 FROM tag_assignments ta
-                JOIN tags t ON t.tagID = ta.tagID AND t.is_visible = 1
+                $tagJoin
                 WHERE ta.itemID IN ($placeholders)
             ");
             $tagStmt->bind_param($types, ...$itemIds);

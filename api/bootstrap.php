@@ -172,5 +172,26 @@ function getMenuItemImageUrl($itemId) {
     return 'img/' . rawurlencode(basename($filePath)) . '?v=' . filemtime($filePath);
 }
 
+function hasTableColumn($conn, $table, $column) {
+    static $cache = [];
+
+    $cacheKey = $table . '.' . $column;
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
+    $safeTable = str_replace('`', '``', $table);
+    $safeColumn = $conn->real_escape_string($column);
+    $result = $conn->query("SHOW COLUMNS FROM `$safeTable` LIKE '$safeColumn'");
+    $exists = $result instanceof mysqli_result && $result->num_rows > 0;
+
+    if ($result instanceof mysqli_result) {
+        $result->free();
+    }
+
+    $cache[$cacheKey] = $exists;
+    return $exists;
+}
+
 $body = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = $_GET['action'] ?? '';

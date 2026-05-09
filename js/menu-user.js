@@ -8,35 +8,66 @@ export async function loadUserMenuData(loadMenuItems, loadUserOrders) {
 }
 
 export function renderCustomerPage() {
-    const searchTerm = state.customerMenuSearch.trim().toLowerCase();
+    const rawSearch = state.customerMenuSearch.trim();
+    // Split by commas or spaces, ignore empty strings
+    const keywords = rawSearch.length > 0
+        ? rawSearch.replace(/,/g, ' ').split(/\s+/).filter(k => k.length > 0).map(k => k.toLowerCase())
+        : [];
     const categoryMap = {};
 
-    // Build a lookup so we can always get a category name, even if item.category_name is missing
+    // Build a lookup for category names
     const categoryById = {};
     for (const cat of state.categories) {
         categoryById[cat.categoryID] = (cat.name || '').toLowerCase();
     }
 
     for (const item of state.menuItems) {
-        // Apply search filter
-        if (searchTerm) {
-            // item name
+        // Apply multi‑keyword search
+        if (keywords.length > 0) {
             const name = String(item.name || '').toLowerCase();
-            // category name – try the joined field first, then look up by ID
             let catName = String(item.category_name || '').toLowerCase();
             if (!catName && item.categoryID && categoryById[item.categoryID]) {
                 catName = categoryById[item.categoryID];
             }
-            // tags
-            const tags = (item.tags || []).map(t => String(t.tag_name || '').toLowerCase());
+            const tags = (item.tags || []).map(t => ({
+                ...t,
+                lower: String(t.tag_name || '').toLowerCase()
+            }));
 
-            const nameMatch = name.includes(searchTerm);
-            const catMatch = catName.includes(searchTerm);
-            const tagMatch = tags.some(t => t.includes(searchTerm));
+            let matched = false;
+            const matchedTags = [];
 
-            if (!nameMatch && !catMatch && !tagMatch) {
+            for (const kw of keywords) {
+                // Name or category match
+                if (name.includes(kw) || catName.includes(kw)) {
+                    matched = true;
+                }
+                // Tag match
+                for (const tag of tags) {
+                    if (tag.lower.includes(kw)) {
+                        matched = true;
+                        if (!matchedTags.some(mt => mt.tagID === tag.tagID)) {
+                            matchedTags.push(tag);
+                        }
+                    }
+                }
+            }
+
+            if (!matched) {
                 continue; // skip this item
             }
+
+            // Determine which tags to display
+            if (matchedTags.length > 0) {
+                // Show only matched tags
+                item._displayTags = matchedTags.map(t => ({ tagID: t.tagID, tag_name: t.tag_name }));
+            } else {
+                // Show all visible tags normally
+                item._displayTags = item.tags || [];
+            }
+        } else {
+            // No search – show all tags
+            item._displayTags = item.tags || [];
         }
 
         const category = item.category_name || 'Other';
@@ -68,6 +99,11 @@ export function renderCustomerPage() {
                 ? `<img class="customer-menu-card-image" src="${item.image_url}" alt="${escapeHtml(item.name)}">`
                 : `<div class="customer-menu-card-image customer-menu-card-image-placeholder">No Image</div>`;
 
+            const displayTags = item._displayTags || [];
+            const tagsHtml = displayTags.length > 0
+                ? `<div class="item-tags">${displayTags.map(t => `<span class="tag-badge">${escapeHtml(t.tag_name)}</span>`).join('')}</div>`
+                : '';
+
             return `
             <article class="customer-menu-card${outOfStock ? ' out-of-stock' : ''}">
                 <div class="customer-menu-card-media">
@@ -78,6 +114,7 @@ export function renderCustomerPage() {
                         <strong class="customer-menu-card-title">${escapeHtml(item.name)}</strong>
                         <div class="customer-menu-card-price">P${(item.price / 100).toFixed(2)}</div>
                     </div>
+                    ${tagsHtml}
                     <div class="customer-menu-card-footer">
                         <span class="customer-menu-card-stock">${outOfStock ? 'Out of Stock' : `Stock: ${item.stock}`}</span>
                         ${outOfStock
@@ -158,11 +195,11 @@ export function renderCustomerPage() {
         <div class="panel customer-menu-panel">
             <h2>Our Menu</h2>
             <div class="form-group" style="max-width:420px;margin-bottom:20px;">
-                <label for="customerMenuSearch">Search Item</label>
+                <label for="customerMenuSearch">Search Items</label>
                 <input
                     type="text"
                     id="customerMenuSearch"
-                    placeholder="Search by name, category, or tag"
+                    placeholder="Search by name, category, or tags (comma or space separated)"
                     value="${escapeHtml(state.customerMenuSearch)}"
                 >
             </div>

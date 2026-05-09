@@ -1,9 +1,17 @@
 <?php
 
+function tagVisibilityColumnExists($conn) {
+    return hasTableColumn($conn, 'tags', 'is_visible');
+}
+
 $adminTagsActions = [
     'getTags' => function ($conn, $body) {
+        $visibilitySelect = tagVisibilityColumnExists($conn)
+            ? 't.is_visible'
+            : '1 AS is_visible';
+
         $result = $conn->query("
-            SELECT t.tagID, t.tag_name, t.is_visible,
+            SELECT t.tagID, t.tag_name, $visibilitySelect,
                    COUNT(ta.itemID) as usage_count
             FROM tags t
             LEFT JOIN tag_assignments ta ON ta.tagID = t.tagID
@@ -39,8 +47,11 @@ $adminTagsActions = [
             respondError('Tag name already exists.');
         }
         $check->close();
-        
-        $stmt = $conn->prepare("INSERT INTO tags (tag_name, is_visible) VALUES (?, 1)");
+
+        $insertSql = tagVisibilityColumnExists($conn)
+            ? "INSERT INTO tags (tag_name, is_visible) VALUES (?, 1)"
+            : "INSERT INTO tags (tag_name) VALUES (?)";
+        $stmt = $conn->prepare($insertSql);
         $stmt->bind_param('s', $tagName);
         
         if (!$stmt->execute()) {
@@ -105,6 +116,10 @@ $adminTagsActions = [
         if ($isVisible === null) {
             respondError('Visibility value is required.');
         }
+        if (!tagVisibilityColumnExists($conn)) {
+            respondError("Tag visibility requires the 'is_visible' database column. Run api/add_tag_visibility.php once to enable it.", 500);
+        }
+
         $visible = $isVisible ? 1 : 0;
         
         $stmt = $conn->prepare("UPDATE tags SET is_visible = ? WHERE tagID = ?");
@@ -166,8 +181,11 @@ $adminTagsActions = [
         if ($tagId <= 0) {
             respondError('Invalid tag ID.');
         }
-        
-        $stmt = $conn->prepare("SELECT tagID, tag_name, is_visible FROM tags WHERE tagID = ?");
+
+        $visibilitySelect = tagVisibilityColumnExists($conn)
+            ? 'is_visible'
+            : '1 AS is_visible';
+        $stmt = $conn->prepare("SELECT tagID, tag_name, $visibilitySelect FROM tags WHERE tagID = ?");
         $stmt->bind_param('i', $tagId);
         $stmt->execute();
         $result = $stmt->get_result();

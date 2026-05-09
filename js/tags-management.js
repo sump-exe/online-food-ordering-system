@@ -15,109 +15,67 @@ export async function loadTags() {
 
 export function renderTagsPage() {
     const tags = state.tags || [];
-    
     const midPoint = Math.ceil(tags.length / 2);
     const leftColumnTags = tags.slice(0, midPoint);
     const rightColumnTags = tags.slice(midPoint);
-    
+
     const renderTagColumn = (tagList) => {
-        if (!tagList || tagList.length === 0) return '';
-        return tagList.map(tag => `
+        if (!tagList || tagList.length === 0) {
+            return '';
+        }
+
+        return tagList.map((tag) => `
             <div class="tag-card" data-tag-id="${tag.tagID}">
                 <div class="tag-content">
                     <div class="tag-name-wrapper">
-                        <span class="tag-icon">🏷️</span>
+                        <span class="tag-icon">&#127991;&#65039;</span>
                         <span class="tag-name">${escapeHtml(tag.tag_name)}</span>
                         ${tag.usage_count > 0 ? `<span class="tag-usage-badge">${tag.usage_count} items</span>` : ''}
                         <span class="tag-visibility-badge ${tag.is_visible ? 'visibility-visible' : 'visibility-hidden'}">
-                            ${tag.is_visible ? '👁 Visible' : '🚫 Hidden'}
+                            ${tag.is_visible ? 'Visible' : 'Hidden'}
                         </span>
                     </div>
                 </div>
                 <div class="tag-actions">
-                    <button class="toggle-visibility-btn small-btn ${tag.is_visible ? 'btn-secondary' : 'btn-success'}"
-                            data-id="${tag.tagID}"
-                            data-visible="${tag.is_visible ? 1 : 0}">
+                    <button
+                        class="toggle-visibility-btn small-btn ${tag.is_visible ? 'btn-secondary' : 'btn-success'}"
+                        data-id="${tag.tagID}"
+                        data-visible="${tag.is_visible ? 1 : 0}"
+                        type="button"
+                    >
                         ${tag.is_visible ? 'Hide' : 'Show'}
                     </button>
-                    <button class="edit-tag-btn btn-secondary small-btn" 
-                            data-id="${tag.tagID}"
-                            data-name="${escapeHtml(tag.tag_name)}">
-                        ✏️ Edit
+                    <button
+                        class="edit-tag-btn btn-secondary small-btn"
+                        data-id="${tag.tagID}"
+                        data-name="${escapeHtml(tag.tag_name)}"
+                        type="button"
+                    >
+                        Edit
                     </button>
-                    <button class="delete-tag-btn btn-danger small-btn" 
-                            data-id="${tag.tagID}"
-                            data-name="${escapeHtml(tag.tag_name)}"
-                            data-usage="${tag.usage_count}">
-                        🗑️ Delete
+                    <button
+                        class="delete-tag-btn btn-danger small-btn"
+                        data-id="${tag.tagID}"
+                        data-name="${escapeHtml(tag.tag_name)}"
+                        data-usage="${tag.usage_count}"
+                        type="button"
+                    >
+                        Delete
                     </button>
                 </div>
             </div>
         `).join('');
     };
-    
+
     return `
-    <div class="admin-page-content">
-        <div class="page-header">
-            <h1>🏷️ Tags Management</h1>
-            <p>Create and manage tags for menu items. Visibility controls whether users see them.</p>
-        </div>
-        
-        <div class="panel">
-            <h2>Add New Tag</h2>
-            <div class="add-tag-form">
-                <div class="form-row">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Tag Name <span style="color: #dc2626;">*</span></label>
-                        <input type="text" id="newTagName" placeholder="e.g., Popular, New, Sale" maxlength="100" autocomplete="off">
-                    </div>
-                    <div class="form-group" style="flex: 0;">
-                        <button id="addTagBtn" class="btn-primary" style="margin-top: 28px;">
-                            ➕ Add Tag
-                        </button>
-                    </div>
-                </div>
-                <div id="addTagMessage" class="form-message" style="display: none;"></div>
-            </div>
-        </div>
-        
-        <div class="panel">
-            <h2>All Tags <span class="tag-count">(${tags.length})</span></h2>
-            ${tags.length === 0 ? `
-                <div class="empty-state">
-                    <span class="empty-icon">🏷️</span>
-                    <p>No tags found. Click "Add Tag" to create your first tag.</p>
-                </div>
-            ` : `
-                <div class="tags-two-columns">
-                    <div class="tags-column">
-                        ${renderTagColumn(leftColumnTags)}
-                    </div>
-                    <div class="tags-column">
-                        ${renderTagColumn(rightColumnTags)}
-                    </div>
-                </div>
-            `}
-        </div>
-    </div>`;
-}
-
-// Keep all existing modal functions (showEditTagModal, showDeleteTagConfirmModal, etc.)
-// unchanged, except we add a small style for the visibility badge in the inline style.
-// We'll add the CSS in a <style> tag via renderTagsPage or rely on existing styles.
-// Since we can't modify styles.css now, we'll add a <style> in the returned HTML.
-
-export function renderTagsPage() {
-    // same as above but with inline style for new badges
-    const styles = `
     <style>
         .tag-visibility-badge {
-            font-size: 0.7rem;
-            margin-left: 8px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-weight: 600;
             display: inline-block;
+            margin-left: 8px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 700;
         }
         .visibility-visible {
             background: #d1fae5;
@@ -128,62 +86,15 @@ export function renderTagsPage() {
             color: #991b1b;
         }
         .toggle-visibility-btn {
-            font-size: 0.75rem;
-            padding: 4px 10px;
-            cursor: pointer;
+            min-width: 62px;
         }
     </style>
-    `;
-    
-    const tags = state.tags || [];
-    
-    const midPoint = Math.ceil(tags.length / 2);
-    const leftColumnTags = tags.slice(0, midPoint);
-    const rightColumnTags = tags.slice(midPoint);
-    
-    const renderTagColumn = (tagList) => {
-        if (!tagList || tagList.length === 0) return '';
-        return tagList.map(tag => `
-            <div class="tag-card" data-tag-id="${tag.tagID}">
-                <div class="tag-content">
-                    <div class="tag-name-wrapper">
-                        <span class="tag-icon">🏷️</span>
-                        <span class="tag-name">${escapeHtml(tag.tag_name)}</span>
-                        ${tag.usage_count > 0 ? `<span class="tag-usage-badge">${tag.usage_count} items</span>` : ''}
-                        <span class="tag-visibility-badge ${tag.is_visible ? 'visibility-visible' : 'visibility-hidden'}">
-                            ${tag.is_visible ? '👁 Visible' : '🚫 Hidden'}
-                        </span>
-                    </div>
-                </div>
-                <div class="tag-actions">
-                    <button class="toggle-visibility-btn small-btn ${tag.is_visible ? 'btn-secondary' : 'btn-success'}"
-                            data-id="${tag.tagID}"
-                            data-visible="${tag.is_visible ? 1 : 0}">
-                        ${tag.is_visible ? 'Hide' : 'Show'}
-                    </button>
-                    <button class="edit-tag-btn btn-secondary small-btn" 
-                            data-id="${tag.tagID}"
-                            data-name="${escapeHtml(tag.tag_name)}">
-                        ✏️ Edit
-                    </button>
-                    <button class="delete-tag-btn btn-danger small-btn" 
-                            data-id="${tag.tagID}"
-                            data-name="${escapeHtml(tag.tag_name)}"
-                            data-usage="${tag.usage_count}">
-                        🗑️ Delete
-                    </button>
-                </div>
-            </div>
-        `).join('');
-    };
-    
-    return styles + `
     <div class="admin-page-content">
         <div class="page-header">
-            <h1>🏷️ Tags Management</h1>
+            <h1>&#127991;&#65039; Tags Management</h1>
             <p>Create and manage tags for menu items. Visibility controls whether users see them.</p>
         </div>
-        
+
         <div class="panel">
             <h2>Add New Tag</h2>
             <div class="add-tag-form">
@@ -193,20 +104,20 @@ export function renderTagsPage() {
                         <input type="text" id="newTagName" placeholder="e.g., Popular, New, Sale" maxlength="100" autocomplete="off">
                     </div>
                     <div class="form-group" style="flex: 0;">
-                        <button id="addTagBtn" class="btn-primary" style="margin-top: 28px;">
-                            ➕ Add Tag
+                        <button id="addTagBtn" class="btn-primary" style="margin-top: 28px;" type="button">
+                            Add Tag
                         </button>
                     </div>
                 </div>
                 <div id="addTagMessage" class="form-message" style="display: none;"></div>
             </div>
         </div>
-        
+
         <div class="panel">
             <h2>All Tags <span class="tag-count">(${tags.length})</span></h2>
             ${tags.length === 0 ? `
                 <div class="empty-state">
-                    <span class="empty-icon">🏷️</span>
+                    <span class="empty-icon">&#127991;&#65039;</span>
                     <p>No tags found. Click "Add Tag" to create your first tag.</p>
                 </div>
             ` : `
@@ -223,117 +134,323 @@ export function renderTagsPage() {
     </div>`;
 }
 
-// (remaining code: showEditTagModal, showDeleteTagConfirmModal, etc. unchanged)
-// but add the toggle event handler in attachTagsEvents
+function showEditTagModal(tag, onSave, onClose) {
+    removeEditTagModal();
+
+    const modalHtml = `
+    <div id="editTagModal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2>Edit Tag</h2>
+                <button class="modal-close" data-close type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modalMessage" class="modal-message" style="display: none;"></div>
+                <div class="form-group">
+                    <label>Tag Name <span style="color: #dc2626;">*</span></label>
+                    <input type="text" id="editTagName" value="${escapeHtml(tag.name)}" maxlength="100" autocomplete="off">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelModalBtn" class="btn-secondary" data-close type="button">Cancel</button>
+                <button id="saveTagBtn" class="btn-primary" type="button">Save Changes</button>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const modal = document.getElementById('editTagModal');
+    const nameInput = document.getElementById('editTagName');
+    const saveBtn = document.getElementById('saveTagBtn');
+    const messageDiv = document.getElementById('modalMessage');
+    const originalName = tag.name;
+
+    const showMessage = (message, isError = true) => {
+        messageDiv.textContent = message;
+        messageDiv.className = `modal-message ${isError ? 'error' : 'success'}`;
+        messageDiv.style.display = 'block';
+    };
+
+    const closeModal = () => {
+        document.removeEventListener('keydown', handleKeyDown);
+        modal.remove();
+        if (onClose) {
+            onClose();
+        }
+    };
+
+    const attemptClose = () => {
+        if (nameInput.value.trim() !== originalName) {
+            const shouldClose = window.confirm('There are still some unsaved changes, are you sure you want to exit?');
+            if (!shouldClose) {
+                return;
+            }
+        }
+
+        closeModal();
+    };
+
+    const handleSave = async () => {
+        const newName = nameInput.value.trim();
+
+        if (!newName) {
+            showMessage('Tag name is required.');
+            nameInput.focus();
+            return;
+        }
+
+        try {
+            await onSave({ ...tag, name: newName });
+            closeModal();
+        } catch (error) {
+            showMessage(error.message);
+        }
+    };
+
+    const handleKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            attemptClose();
+        }
+
+        if (event.key === 'Enter' && document.activeElement === nameInput) {
+            event.preventDefault();
+            handleSave();
+        }
+    };
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal || event.target.hasAttribute('data-close')) {
+            attemptClose();
+        }
+    });
+
+    saveBtn.addEventListener('click', handleSave);
+    document.addEventListener('keydown', handleKeyDown);
+
+    nameInput.focus();
+    nameInput.select();
+}
+
+function showDeleteTagConfirmModal(tagId, tagName, usageCount, onConfirm) {
+    removeDeleteTagConfirmModal();
+
+    const modalHtml = `
+    <div id="deleteTagConfirmModal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2>Confirm Delete</h2>
+                <button class="modal-close" id="closeDeleteModalBtn" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete tag <strong>"${escapeHtml(tagName)}"</strong>?</p>
+                ${usageCount > 0 ? `
+                    <div class="warning-box">
+                        <span>&#9888;&#65039;</span>
+                        <p>This tag is currently used by <strong>${usageCount}</strong> menu item(s). Deleting it will remove this tag from those items.</p>
+                    </div>
+                ` : ''}
+                <p style="color: #dc2626; font-size: 0.85rem;">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelDeleteBtn" class="btn-secondary" type="button">Cancel</button>
+                <button id="confirmDeleteBtn" class="btn-danger" type="button">Delete Tag</button>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const modal = document.getElementById('deleteTagConfirmModal');
+    const closeBtn = document.getElementById('closeDeleteModalBtn');
+    const cancelBtn = document.getElementById('cancelDeleteBtn');
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+    const closeModal = () => {
+        document.removeEventListener('keydown', handleKeyDown);
+        modal.remove();
+    };
+
+    const handleKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            closeModal();
+        }
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    confirmBtn.addEventListener('click', () => {
+        closeModal();
+        onConfirm();
+    });
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+    document.addEventListener('keydown', handleKeyDown);
+}
+
+function removeEditTagModal() {
+    const existingModal = document.getElementById('editTagModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+}
+
+function removeDeleteTagConfirmModal() {
+    const existingModal = document.getElementById('deleteTagConfirmModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) {
+        return '';
+    }
+
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+async function addTag(tagData) {
+    return apiPost('addTag', {
+        tag_name: tagData.name,
+    });
+}
+
+async function updateTag(tagData) {
+    return apiPost('updateTag', {
+        tagID: tagData.tagID,
+        tag_name: tagData.name,
+    });
+}
+
+async function updateTagVisibility(tagId, isVisible) {
+    return apiPost('updateTagVisibility', {
+        tagID: tagId,
+        is_visible: isVisible,
+    });
+}
+
+async function deleteTag(tagId) {
+    return apiPost('deleteTag', {
+        tagID: tagId,
+    });
+}
+
+async function rerenderTags(renderApp, refreshTags) {
+    if (renderApp) {
+        await renderApp();
+        return;
+    }
+
+    if (refreshTags) {
+        await refreshTags();
+    }
+}
 
 export function attachTagsEvents(callbacks) {
     const { renderApp, refreshTags } = callbacks;
-    
     const addBtn = document.getElementById('addTagBtn');
     const newTagName = document.getElementById('newTagName');
     const messageDiv = document.getElementById('addTagMessage');
-    
+
     const showAddMessage = (message, isError = true) => {
-        if (messageDiv) {
-            messageDiv.textContent = message;
-            messageDiv.className = `form-message ${isError ? 'error' : 'success'}`;
-            messageDiv.style.display = 'block';
-            setTimeout(() => {
-                messageDiv.style.display = 'none';
-            }, 3000);
+        if (!messageDiv) {
+            return;
         }
+
+        messageDiv.textContent = message;
+        messageDiv.className = `form-message ${isError ? 'error' : 'success'}`;
+        messageDiv.style.display = 'block';
     };
-    
+
     if (addBtn) {
         addBtn.addEventListener('click', async () => {
             const name = newTagName?.value.trim();
-            
+
             if (!name) {
                 showAddMessage('Tag name is required.');
                 newTagName?.focus();
                 return;
             }
-            
+
             try {
-                const result = await apiPost('addTag', { tag_name: name });
-                if (newTagName) newTagName.value = '';
-                if (refreshTags) await refreshTags();
-                if (renderApp) await renderApp();
-                showAddMessage(result.message || 'Tag added successfully!', false);
+                await addTag({ name });
+                if (newTagName) {
+                    newTagName.value = '';
+                }
+                await rerenderTags(renderApp, refreshTags);
             } catch (error) {
                 showAddMessage(error.message);
             }
         });
     }
-    
+
     if (newTagName) {
-        newTagName.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && addBtn) {
+        newTagName.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && addBtn) {
+                event.preventDefault();
                 addBtn.click();
             }
         });
     }
-    
-    // Toggle visibility handler
-    document.addEventListener('click', async (e) => {
-        const toggleBtn = e.target.closest('.toggle-visibility-btn');
-        if (!toggleBtn) return;
-        const tagId = parseInt(toggleBtn.dataset.id, 10);
-        const currentVisible = toggleBtn.dataset.visible === '1';
-        const newVisible = !currentVisible;
-        try {
-            await apiPost('updateTagVisibility', { tagID: tagId, is_visible: newVisible });
-            if (refreshTags) await refreshTags();
-            if (renderApp) await renderApp();
-        } catch (error) {
-            alert('Failed to update visibility: ' + error.message);
-        }
+
+    document.querySelectorAll('.toggle-visibility-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const tagId = parseInt(button.dataset.id, 10);
+            const currentVisible = button.dataset.visible === '1';
+
+            try {
+                await updateTagVisibility(tagId, !currentVisible);
+                await rerenderTags(renderApp, refreshTags);
+            } catch (error) {
+                window.alert('Failed to update visibility: ' + error.message);
+            }
+        });
     });
-    
-    document.addEventListener('click', (e) => {
-        const editBtn = e.target.closest('.edit-tag-btn');
-        if (editBtn) {
+
+    document.querySelectorAll('.edit-tag-btn').forEach((button) => {
+        button.addEventListener('click', () => {
             const tag = {
-                tagID: parseInt(editBtn.dataset.id, 10),
-                name: editBtn.dataset.name
+                tagID: parseInt(button.dataset.id, 10),
+                name: button.dataset.name,
             };
+
             showEditTagModal(
                 tag,
                 async (updatedTag) => {
                     await updateTag(updatedTag);
-                    if (refreshTags) await refreshTags();
-                    if (renderApp) await renderApp();
+                    await rerenderTags(renderApp, refreshTags);
                 },
                 () => {}
             );
-        }
+        });
     });
-    
-    document.addEventListener('click', (e) => {
-        const deleteBtn = e.target.closest('.delete-tag-btn');
-        if (deleteBtn) {
-            const tagId = parseInt(deleteBtn.dataset.id, 10);
-            const tagName = deleteBtn.dataset.name;
-            const usageCount = parseInt(deleteBtn.dataset.usage, 10);
-            
+
+    document.querySelectorAll('.delete-tag-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const tagId = parseInt(button.dataset.id, 10);
+            const tagName = button.dataset.name;
+            const usageCount = parseInt(button.dataset.usage, 10);
+
             showDeleteTagConfirmModal(tagId, tagName, usageCount, async () => {
                 try {
                     const result = await deleteTag(tagId);
-                    if (refreshTags) await refreshTags();
-                    if (renderApp) await renderApp();
+                    await rerenderTags(renderApp, refreshTags);
                     if (result.message) {
-                        alert(result.message);
+                        window.alert(result.message);
                     }
                 } catch (error) {
-                    alert('Failed to delete tag: ' + error.message);
+                    window.alert('Failed to delete tag: ' + error.message);
                 }
             });
-        }
+        });
     });
 }
-
-// include showEditTagModal, showDeleteTagConfirmModal, removeEditTagModal, etc. unchanged
-// for brevity they are omitted here but must be present as in the original file.
-// I'll include the complete file with all functions.
-
-// ---------- (complete file pasted below would include all those functions) ----------
