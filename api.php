@@ -25,7 +25,6 @@ $routes = [
     'users_management_admin' => $adminUsersManagementActions,
     'category_management_admin' => $adminCategoryActions,
     'tags_management_admin' => $adminTagsActions,
-    'updateTagVisibility' => ['group' => 'tags_management_admin', 'handler' => 'updateTagVisibility'],
 ];
 
 $actionMap = [
@@ -104,16 +103,14 @@ $actionMap = [
 
     // Admin Tags Management
     'getTags' => ['group' => 'tags_management_admin', 'handler' => 'getTags'],
+    'getDeletedTags' => ['group' => 'tags_management_admin', 'handler' => 'getDeletedTags'],
     'addTag' => ['group' => 'tags_management_admin', 'handler' => 'addTag'],
     'updateTag' => ['group' => 'tags_management_admin', 'handler' => 'updateTag'],
     'updateTagVisibility' => ['group' => 'tags_management_admin', 'handler' => 'updateTagVisibility'],
     'deleteTag' => ['group' => 'tags_management_admin', 'handler' => 'deleteTag'],
-    'getTagById' => ['group' => 'tags_management_admin', 'handler' => 'getTagById'],
-
-    // Admin Tags Management (Trash operations)
-    'getDeletedTags' => ['group' => 'tags_management_admin', 'handler' => 'getDeletedTags'],
     'restoreTag' => ['group' => 'tags_management_admin', 'handler' => 'restoreTag'],
     'permanentlyDeleteTag' => ['group' => 'tags_management_admin', 'handler' => 'permanentlyDeleteTag'],
+    'getTagById' => ['group' => 'tags_management_admin', 'handler' => 'getTagById'],
 ];
 
 if (!isset($actionMap[$action])) {
