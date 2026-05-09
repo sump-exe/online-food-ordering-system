@@ -14,6 +14,7 @@ export const state = {
     users: [],
     salesByDate: [],
     salesByCustomer: [],
+    deletedTags: [],
     currentResetToken: null,
     currentResetUsername: null,
     isOrderHistoryOpen: false,

@@ -15,6 +15,7 @@ $adminTagsActions = [
                    COUNT(ta.itemID) as usage_count
             FROM tags t
             LEFT JOIN tag_assignments ta ON ta.tagID = t.tagID
+            WHERE COALESCE(t.is_deleted, 0) = 0
             GROUP BY t.tagID
             ORDER BY t.tag_name
         ");
@@ -31,6 +32,35 @@ $adminTagsActions = [
         respond($tags);
     },
     
+    'getDeletedTags' => function ($conn, $body) {
+        $visibilitySelect = tagVisibilityColumnExists($conn)
+            ? 't.is_visible'
+            : '1 AS is_visible';
+
+        $result = $conn->query("
+            SELECT t.tagID, t.tag_name, $visibilitySelect,
+                   COUNT(ta.itemID) as usage_count,
+                   t.deleted_at
+            FROM tags t
+            LEFT JOIN tag_assignments ta ON ta.tagID = t.tagID
+            WHERE COALESCE(t.is_deleted, 0) = 1
+            GROUP BY t.tagID
+            ORDER BY t.deleted_at DESC, t.tag_name
+        ");
+        
+        $tags = [];
+        while ($row = $result->fetch_assoc()) {
+            $tags[] = [
+                'tagID' => (int)$row['tagID'],
+                'tag_name' => $row['tag_name'],
+                'is_visible' => (bool)$row['is_visible'],
+                'usage_count' => (int)$row['usage_count'],
+                'deleted_at' => $row['deleted_at']
+            ];
+        }
+        respond($tags);
+    },
+    
     'addTag' => function ($conn, $body) {
         $tagName = trim($body['tag_name'] ?? '');
         
@@ -38,7 +68,7 @@ $adminTagsActions = [
             respondError('Tag name is required.');
         }
         
-        $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ?");
+        $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ? AND COALESCE(is_deleted, 0) = 0");
         $check->bind_param('s', $tagName);
         $check->execute();
         $check->store_result();
@@ -82,7 +112,7 @@ $adminTagsActions = [
             respondError('Tag name is required.');
         }
         
-        $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ? AND tagID != ?");
+        $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ? AND tagID != ? AND COALESCE(is_deleted, 0) = 0");
         $check->bind_param('si', $tagName, $tagId);
         $check->execute();
         $check->store_result();
@@ -92,7 +122,7 @@ $adminTagsActions = [
         }
         $check->close();
         
-        $stmt = $conn->prepare("UPDATE tags SET tag_name = ? WHERE tagID = ?");
+        $stmt = $conn->prepare("UPDATE tags SET tag_name = ? WHERE tagID = ? AND COALESCE(is_deleted, 0) = 0");
         $stmt->bind_param('si', $tagName, $tagId);
         if (!$stmt->execute()) {
             $stmt->close();
@@ -122,7 +152,7 @@ $adminTagsActions = [
 
         $visible = $isVisible ? 1 : 0;
         
-        $stmt = $conn->prepare("UPDATE tags SET is_visible = ? WHERE tagID = ?");
+        $stmt = $conn->prepare("UPDATE tags SET is_visible = ? WHERE tagID = ? AND COALESCE(is_deleted, 0) = 0");
         $stmt->bind_param('ii', $visible, $tagId);
         if (!$stmt->execute()) {
             $stmt->close();
@@ -136,6 +166,7 @@ $adminTagsActions = [
         ]);
     },
     
+    // Soft delete (move to trash)
     'deleteTag' => function ($conn, $body) {
         $tagId = (int)($body['tagID'] ?? 0);
         
@@ -143,35 +174,114 @@ $adminTagsActions = [
             respondError('Invalid tag ID.');
         }
         
+        // Get tag info for response
+        $stmt = $conn->prepare("SELECT tag_name FROM tags WHERE tagID = ? AND COALESCE(is_deleted, 0) = 0");
+        $stmt->bind_param('i', $tagId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $tag = $result->fetch_assoc();
+        $stmt->close();
+        
+        if (!$tag) {
+            respondError('Tag not found or already deleted.');
+        }
+        
+        // Check usage count for warning
         $check = $conn->prepare("SELECT COUNT(*) as count FROM tag_assignments WHERE tagID = ?");
         $check->bind_param('i', $tagId);
         $check->execute();
-        $result = $check->get_result();
-        $row = $result->fetch_assoc();
+        $res = $check->get_result();
+        $row = $res->fetch_assoc();
+        $usageCount = (int)($row['count'] ?? 0);
         $check->close();
         
-        $message = '';
-        if ($row['count'] > 0) {
-            $message = " Tag was removed from {$row['count']} menu item(s).";
-        }
-        
-        $delAssign = $conn->prepare("DELETE FROM tag_assignments WHERE tagID = ?");
-        $delAssign->bind_param('i', $tagId);
-        $delAssign->execute();
-        $delAssign->close();
-        
-        $stmt = $conn->prepare("DELETE FROM tags WHERE tagID = ?");
+        // Soft delete
+        $stmt = $conn->prepare("UPDATE tags SET is_deleted = 1, deleted_at = NOW() WHERE tagID = ? AND COALESCE(is_deleted, 0) = 0");
         $stmt->bind_param('i', $tagId);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            respondError('Failed to delete tag: ' . $conn->error);
-        }
+        executePrepared($stmt, 'Failed to move tag to trash');
+        $deleted = $stmt->affected_rows;
         $stmt->close();
+        
+        if ($deleted === 0) {
+            respondError('Tag not found or already deleted.');
+        }
+        
+        $message = "Tag '{$tag['tag_name']}' moved to trash.";
+        if ($usageCount > 0) {
+            $message .= " It was used by {$usageCount} menu item(s).";
+        }
         
         respond([
             'success' => true,
-            'message' => 'Tag deleted successfully.' . $message,
-            'affected_items' => $row['count']
+            'message' => $message,
+            'usage_count' => $usageCount
+        ]);
+    },
+    
+    // Restore tag from trash
+    'restoreTag' => function ($conn, $body) {
+        $tagId = (int)($body['tagID'] ?? 0);
+        
+        if ($tagId <= 0) {
+            respondError('Invalid tag ID.');
+        }
+        
+        $stmt = $conn->prepare("UPDATE tags SET is_deleted = 0, deleted_at = NULL WHERE tagID = ? AND COALESCE(is_deleted, 0) = 1");
+        $stmt->bind_param('i', $tagId);
+        executePrepared($stmt, 'Failed to restore tag');
+        $restored = $stmt->affected_rows;
+        $stmt->close();
+        
+        if ($restored === 0) {
+            respondError('Tag not found in trash.');
+        }
+        
+        respond([
+            'success' => true,
+            'message' => 'Tag restored successfully.'
+        ]);
+    },
+    
+    // Permanently delete tag (only from trash)
+    'permanentlyDeleteTag' => function ($conn, $body) {
+        $tagId = (int)($body['tagID'] ?? 0);
+        
+        if ($tagId <= 0) {
+            respondError('Invalid tag ID.');
+        }
+        
+        // Get tag info for message
+        $stmt = $conn->prepare("SELECT tag_name FROM tags WHERE tagID = ? AND COALESCE(is_deleted, 0) = 1");
+        $stmt->bind_param('i', $tagId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $tag = $result->fetch_assoc();
+        $stmt->close();
+        
+        if (!$tag) {
+            respondError('Tag not found in trash.');
+        }
+        
+        // Remove tag assignments first
+        $stmt = $conn->prepare("DELETE FROM tag_assignments WHERE tagID = ?");
+        $stmt->bind_param('i', $tagId);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Permanently delete the tag
+        $stmt = $conn->prepare("DELETE FROM tags WHERE tagID = ? AND COALESCE(is_deleted, 0) = 1");
+        $stmt->bind_param('i', $tagId);
+        executePrepared($stmt, 'Failed to permanently delete tag');
+        $deleted = $stmt->affected_rows;
+        $stmt->close();
+        
+        if ($deleted === 0) {
+            respondError('Tag not found in trash.');
+        }
+        
+        respond([
+            'success' => true,
+            'message' => "Tag '{$tag['tag_name']}' permanently deleted."
         ]);
     },
     
@@ -185,7 +295,7 @@ $adminTagsActions = [
         $visibilitySelect = tagVisibilityColumnExists($conn)
             ? 'is_visible'
             : '1 AS is_visible';
-        $stmt = $conn->prepare("SELECT tagID, tag_name, $visibilitySelect FROM tags WHERE tagID = ?");
+        $stmt = $conn->prepare("SELECT tagID, tag_name, $visibilitySelect FROM tags WHERE tagID = ? AND COALESCE(is_deleted, 0) = 0");
         $stmt->bind_param('i', $tagId);
         $stmt->execute();
         $result = $stmt->get_result();

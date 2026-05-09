@@ -13,6 +13,18 @@ export async function loadTags() {
     }
 }
 
+export async function loadDeletedTags() {
+    try {
+        const deletedTags = await apiGet('getDeletedTags');
+        state.deletedTags = deletedTags || [];
+        return state.deletedTags;
+    } catch (error) {
+        console.error('Failed to load deleted tags:', error);
+        state.deletedTags = [];
+        return [];
+    }
+}
+
 export function renderTagsPage() {
     const tags = state.tags || [];
     const midPoint = Math.ceil(tags.length / 2);
@@ -134,6 +146,60 @@ export function renderTagsPage() {
     </div>`;
 }
 
+// Render deleted tags section for Trash page
+export function renderDeletedTagsSection() {
+    const tags = state.deletedTags || [];
+    if (tags.length === 0) {
+        return `
+        <div class="panel" style="margin-top:32px;">
+            <h2>🗑️ Deleted Tags</h2>
+            <p style="text-align:center; color:#aaa; padding:20px;">No deleted tags.</p>
+        </div>`;
+    }
+
+    const midPoint = Math.ceil(tags.length / 2);
+    const leftColumnTags = tags.slice(0, midPoint);
+    const rightColumnTags = tags.slice(midPoint);
+
+    const renderTagColumn = (tagList) => {
+        return tagList.map((tag) => `
+            <div class="tag-card" style="flex-direction: column; align-items: flex-start;">
+                <div class="tag-content">
+                    <div class="tag-name-wrapper">
+                        <span class="tag-icon">&#127991;&#65039;</span>
+                        <span class="tag-name">${escapeHtml(tag.tag_name)}</span>
+                        ${tag.usage_count > 0 ? `<span class="tag-usage-badge">${tag.usage_count} items</span>` : ''}
+                    </div>
+                    <div style="font-size:0.8rem; color:#7a6070; margin-top:4px;">
+                        Deleted: ${tag.deleted_at ? new Date(tag.deleted_at).toLocaleString() : '-'}
+                    </div>
+                </div>
+                <div class="tag-actions" style="margin-top:10px; width:100%; justify-content: flex-end;">
+                    <button class="restoreTagBtn btn-success small-btn" data-id="${tag.tagID}" data-name="${escapeHtml(tag.tag_name)}">
+                        ↺ Restore
+                    </button>
+                    <button class="permanentDeleteTagBtn btn-danger small-btn" data-id="${tag.tagID}" data-name="${escapeHtml(tag.tag_name)}">
+                        ⚠️ Delete Forever
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    };
+
+    return `
+    <div class="panel" style="margin-top:32px;">
+        <h2>🗑️ Deleted Tags</h2>
+        <div class="tags-two-columns">
+            <div class="tags-column">
+                ${renderTagColumn(leftColumnTags)}
+            </div>
+            <div class="tags-column">
+                ${renderTagColumn(rightColumnTags)}
+            </div>
+        </div>
+    </div>`;
+}
+
 function showEditTagModal(tag, onSave, onClose) {
     removeEditTagModal();
 
@@ -243,18 +309,18 @@ function showDeleteTagConfirmModal(tagId, tagName, usageCount, onConfirm) {
                 <button class="modal-close" id="closeDeleteModalBtn" type="button">&times;</button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete tag <strong>"${escapeHtml(tagName)}"</strong>?</p>
+                <p>Are you sure you want to move tag <strong>"${escapeHtml(tagName)}"</strong> to Trash?</p>
                 ${usageCount > 0 ? `
                     <div class="warning-box">
                         <span>&#9888;&#65039;</span>
                         <p>This tag is currently used by <strong>${usageCount}</strong> menu item(s). Deleting it will remove this tag from those items.</p>
                     </div>
                 ` : ''}
-                <p style="color: #dc2626; font-size: 0.85rem;">This action cannot be undone.</p>
+                <p style="color: #7a6070; font-size: 0.85rem;">You can restore it later from the Trash.</p>
             </div>
             <div class="modal-footer">
                 <button id="cancelDeleteBtn" class="btn-secondary" type="button">Cancel</button>
-                <button id="confirmDeleteBtn" class="btn-danger" type="button">Delete Tag</button>
+                <button id="confirmDeleteBtn" class="btn-danger" type="button">Move to Trash</button>
             </div>
         </div>
     </div>`;
@@ -340,6 +406,18 @@ async function updateTagVisibility(tagId, isVisible) {
 
 async function deleteTag(tagId) {
     return apiPost('deleteTag', {
+        tagID: tagId,
+    });
+}
+
+async function restoreTag(tagId) {
+    return apiPost('restoreTag', {
+        tagID: tagId,
+    });
+}
+
+async function permanentlyDeleteTag(tagId) {
+    return apiPost('permanentlyDeleteTag', {
         tagID: tagId,
     });
 }
@@ -451,6 +529,41 @@ export function attachTagsEvents(callbacks) {
                     window.alert('Failed to delete tag: ' + error.message);
                 }
             });
+        });
+    });
+}
+
+// Attach events for trash page (restore and permanent delete)
+export function attachTrashTagEvents(callbacks) {
+    const { renderApp, refreshDeletedTags } = callbacks;
+
+    document.querySelectorAll('.restoreTagBtn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const tagId = parseInt(btn.dataset.id, 10);
+            try {
+                const result = await restoreTag(tagId);
+                alert(result.message);
+                if (refreshDeletedTags) await refreshDeletedTags();
+                if (renderApp) await renderApp();
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+    });
+
+    document.querySelectorAll('.permanentDeleteTagBtn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const tagId = parseInt(btn.dataset.id, 10);
+            const tagName = btn.dataset.name;
+            if (!confirm(`Permanently delete tag "${tagName}"? This action cannot be undone.`)) return;
+            try {
+                const result = await permanentlyDeleteTag(tagId);
+                alert(result.message);
+                if (refreshDeletedTags) await refreshDeletedTags();
+                if (renderApp) await renderApp();
+            } catch (error) {
+                alert(error.message);
+            }
         });
     });
 }

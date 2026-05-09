@@ -109,6 +109,11 @@ $actionMap = [
     'updateTagVisibility' => ['group' => 'tags_management_admin', 'handler' => 'updateTagVisibility'],
     'deleteTag' => ['group' => 'tags_management_admin', 'handler' => 'deleteTag'],
     'getTagById' => ['group' => 'tags_management_admin', 'handler' => 'getTagById'],
+
+    // Admin Tags Management (Trash operations)
+    'getDeletedTags' => ['group' => 'tags_management_admin', 'handler' => 'getDeletedTags'],
+    'restoreTag' => ['group' => 'tags_management_admin', 'handler' => 'restoreTag'],
+    'permanentlyDeleteTag' => ['group' => 'tags_management_admin', 'handler' => 'permanentlyDeleteTag'],
 ];
 
 if (!isset($actionMap[$action])) {

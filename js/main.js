@@ -31,7 +31,10 @@ import {
 import {
     loadTags,
     renderTagsPage,
-    attachTagsEvents
+    attachTagsEvents,
+    renderDeletedTagsSection,  // Add this
+    attachTrashTagEvents,      // Add this
+    loadDeletedTags            // Add this
 } from './tags-management.js';
 
 function getRoot() {
@@ -66,7 +69,7 @@ function renderAdminPageContent() {
         return renderAdminUsersPage();
     }
     if (state.adminPage === 'trash') {
-        return renderAdminTrashPage() + renderDeletedMenuItemsSection();
+        return renderAdminTrashPage() + renderDeletedMenuItemsSection() + renderDeletedTagsSection();
     }
     return renderAdminMenuPage();
 }
@@ -157,6 +160,12 @@ export function renderInPlace() {
                     await loadDeletedMenuItems();
                 }
             });
+            attachTrashTagEvents({   // Add this
+                renderApp,
+                refreshDeletedTags: async () => {
+                    await loadDeletedTags();
+                }
+            });
         }
         return;
     }
@@ -194,6 +203,7 @@ export async function renderApp() {
                 loadInventoryData(),
                 loadDeletedCategories(),
                 loadDeletedMenuItems(),
+                loadDeletedTags(), // Add this
             ]);
         } else {
             console.log('Loading customer data...');
