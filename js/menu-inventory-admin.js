@@ -504,7 +504,7 @@ export function attachAdminMenuInventoryEvents(callbacks) {
 }
 
 // ========== TRASH – ITEMS SECTION (only if there are items) ==========
-export function renderDeletedMenuItemsSection() {
+function renderDeletedMenuItemsSectionLegacy() {
     const items = state.deletedMenuItems || [];
     if (items.length === 0) return '';
 
@@ -535,6 +535,48 @@ export function renderDeletedMenuItemsSection() {
                 </thead>
                 <tbody>${rowsHtml}</tbody>
             </table>
+        </div>
+    </div>`;
+}
+
+export function renderDeletedMenuItemsSection() {
+    const items = state.deletedMenuItems || [];
+    if (items.length === 0) return '';
+
+    const midPoint = Math.ceil(items.length / 2);
+    const leftColumnItems = items.slice(0, midPoint);
+    const rightColumnItems = items.slice(midPoint);
+
+    const renderItemColumn = (itemList) => {
+        return itemList.map((item) => `
+            <div class="tag-card" style="flex-direction: column; align-items: flex-start;">
+                <div class="tag-content">
+                    <div class="tag-name-wrapper">
+                        <span class="tag-icon">&#127869;&#65039;</span>
+                        <span class="tag-name">${escapeHtml(item.name)}</span>
+                    </div>
+                    <div style="font-size:0.8rem; color:#7a6070; margin-top:4px;">
+                        Category: ${escapeHtml(item.category_name || 'Uncategorized')} &nbsp;|&nbsp; Price: P${(item.price / 100).toFixed(2)} &nbsp;|&nbsp; Stock: ${item.stock} &nbsp;|&nbsp; Deleted: ${item.deleted_at ? new Date(item.deleted_at).toLocaleString() : '-'}
+                    </div>
+                </div>
+                <div class="tag-actions" style="margin-top:10px; width:100%; justify-content: flex-end;">
+                    <button class="restoreItemBtn btn-success small-btn" data-id="${item.itemID}">&#8617; Restore</button>
+                    <button class="permanentDeleteItemBtn btn-danger small-btn" data-id="${item.itemID}" data-name="${escapeHtml(item.name)}">&#9888;&#65039; Delete Forever</button>
+                </div>
+            </div>
+        `).join('');
+    };
+
+    return `
+    <div class="panel" style="margin-top:32px;">
+        <h2>&#128465;&#65039; Deleted Menu Items</h2>
+        <div class="tags-two-columns">
+            <div class="tags-column">
+                ${renderItemColumn(leftColumnItems)}
+            </div>
+            <div class="tags-column">
+                ${renderItemColumn(rightColumnItems)}
+            </div>
         </div>
     </div>`;
 }
