@@ -101,7 +101,7 @@ export function renderCustomerPage() {
 
             const displayTags = item._displayTags || [];
             const tagsHtml = displayTags.length > 0
-                ? `<div class="item-tags">${displayTags.map(t => `<span class="tag-badge">${escapeHtml(t.tag_name)}</span>`).join('')}</div>`
+                ? `<div class="item-tags">${displayTags.map(t => `<span class="tag-badge">${escapeHtml(t.tag_name)}</span>`).join(', ')}</div>`
                 : '';
 
             return `
