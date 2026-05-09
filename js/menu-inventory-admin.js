@@ -1,3 +1,6 @@
+// ============================================================
+// File: js/menu-inventory-admin.js (updated renderDeletedMenuItemsSection)
+// ============================================================
 import { apiGet, apiPost } from './api.js';
 import { state } from './state.js';
 
@@ -82,7 +85,6 @@ export function renderAdminMenuPage() {
         `<option value="${category.categoryID}">${escapeHtml(category.name)}</option>`
     )).join('');
 
-    // Build tag checkboxes HTML
     const tagsCheckboxes = (state.tags || []).map(tag => `
         <label style="margin-right:12px; cursor:pointer; display:inline-block;">
             <input type="checkbox" name="itemTags" value="${tag.tagID}" style="margin-right:4px;">${escapeHtml(tag.tag_name)}
@@ -319,7 +321,6 @@ async function showEditModal(itemId, categoryOptions, onSaveSuccess) {
         document.getElementById('editItemStock').value = item.stock;
         document.getElementById('editItemCategory').value = item.categoryID || 0;
         
-        // Render tags checkboxes
         const tagsContainer = document.getElementById('editItemTags');
         tagsContainer.innerHTML = '';
         const allTags = state.tags || [];
@@ -452,7 +453,6 @@ export function attachAdminMenuInventoryEvents(callbacks) {
                 return;
             }
             
-            // Gather selected tag IDs
             const tagCheckboxes = document.querySelectorAll('#editItemTags input[name="editItemTags"]:checked');
             const tagIds = Array.from(tagCheckboxes).map(cb => parseInt(cb.value, 10));
             formData.append('tags', JSON.stringify(tagIds));
@@ -493,7 +493,6 @@ export function attachAdminMenuInventoryEvents(callbacks) {
                 return;
             }
             
-            // Collect tag IDs from add form
             const addTagCheckboxes = document.querySelectorAll('#addItemTags input[name="itemTags"]:checked');
             const tagIds = Array.from(addTagCheckboxes).map(cb => parseInt(cb.value, 10));
             
@@ -504,17 +503,10 @@ export function attachAdminMenuInventoryEvents(callbacks) {
     }
 }
 
-// ========== TRASH – ITEMS ==========
-
+// ========== TRASH – ITEMS SECTION (only if there are items) ==========
 export function renderDeletedMenuItemsSection() {
     const items = state.deletedMenuItems || [];
-    if (items.length === 0) {
-        return `
-        <div class="panel" style="margin-top:32px;">
-            <h2>🗑️ Deleted Menu Items</h2>
-            <p style="text-align:center; color:#aaa; padding:20px;">No deleted items.</p>
-        </div>`;
-    }
+    if (items.length === 0) return '';
 
     const rowsHtml = items.map(item => `
         <tr>

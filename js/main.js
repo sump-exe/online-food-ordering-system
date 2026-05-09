@@ -1,3 +1,6 @@
+// ============================================================
+// File: js/main.js
+// ============================================================
 import { state } from './state.js';
 import { checkForResetToken, logout, renderAuthScreen } from './login.js';
 import {
@@ -17,10 +20,8 @@ import { loadUserOrders } from './order-history-user.js';
 import { attachCustomerEvents, renderCustomerPage } from './menu-user.js';
 import {
     loadCategories as loadAdminCategories,
-    renderAdminCategoriesPage,
+    renderDeletedCategoriesSection,
     attachCategoryEvents,
-    renderAdminTrashPage,
-    attachTrashEvents,
     loadDeletedCategories,
 } from './category-management-admin.js';
 import {
@@ -32,9 +33,9 @@ import {
     loadTags,
     renderTagsPage,
     attachTagsEvents,
-    renderDeletedTagsSection,  // Add this
-    attachTrashTagEvents,      // Add this
-    loadDeletedTags            // Add this
+    renderDeletedTagsSection,
+    attachTrashTagEvents,
+    loadDeletedTags
 } from './tags-management.js';
 
 function getRoot() {
@@ -69,7 +70,38 @@ function renderAdminPageContent() {
         return renderAdminUsersPage();
     }
     if (state.adminPage === 'trash') {
-        return renderAdminTrashPage() + renderDeletedMenuItemsSection() + renderDeletedTagsSection();
+        // 🔁 Conditionally show sections only if they contain items
+        const hasCategories = state.deletedAdminCategories && state.deletedAdminCategories.length > 0;
+        const hasMenuItems = state.deletedMenuItems && state.deletedMenuItems.length > 0;
+        const hasTags = state.deletedTags && state.deletedTags.length > 0;
+
+        // If absolutely nothing is in trash, show a friendly empty state
+        if (!hasCategories && !hasMenuItems && !hasTags) {
+            return `
+            <div class="admin-page-content">
+                <div class="page-header">
+                    <h1>🗑️ Trash</h1>
+                    <p>Deleted items, categories, and tags are shown here. You can restore or permanently delete them.</p>
+                </div>
+                <div class="empty-state" style="padding:80px 20px; text-align:center;">
+                    <span class="empty-icon" style="font-size:3rem;">🗑️</span>
+                    <p style="color:#7a6070; margin-top:16px;">Trash is empty – nothing deleted yet.</p>
+                </div>
+            </div>`;
+        }
+
+        // Build page – show only non‑empty sections
+        let html = `
+        <div class="admin-page-content">
+            <div class="page-header">
+                <h1>🗑️ Trash</h1>
+                <p>Deleted items, categories, and tags are shown here. You can restore or permanently delete them.</p>
+            </div>`;
+        if (hasCategories) html += renderDeletedCategoriesSection();
+        if (hasMenuItems) html += renderDeletedMenuItemsSection();
+        if (hasTags) html += renderDeletedTagsSection();
+        html += `</div>`;
+        return html;
     }
     return renderAdminMenuPage();
 }
@@ -160,7 +192,7 @@ export function renderInPlace() {
                     await loadDeletedMenuItems();
                 }
             });
-            attachTrashTagEvents({   // Add this
+            attachTrashTagEvents({
                 renderApp,
                 refreshDeletedTags: async () => {
                     await loadDeletedTags();
@@ -203,7 +235,7 @@ export async function renderApp() {
                 loadInventoryData(),
                 loadDeletedCategories(),
                 loadDeletedMenuItems(),
-                loadDeletedTags(), // Add this
+                loadDeletedTags(),
             ]);
         } else {
             console.log('Loading customer data...');

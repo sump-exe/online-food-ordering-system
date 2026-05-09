@@ -1,3 +1,6 @@
+// ============================================================
+// File: js/category-management-admin.js
+// ============================================================
 import { apiGet, apiPost } from './api.js';
 import { state } from './state.js';
 
@@ -103,7 +106,7 @@ export function renderAdminCategoriesPage() {
                         <tbody>
                             ${rowsHtml || '<tr><td colspan="6" style="text-align: center; padding: 30px; color: #aaa;">No categories found. Click "Add Category" to create one.</td></tr>'}
                         </tbody>
-                    </table>
+                     </table>
                 </div>
             </div>
         `;
@@ -132,23 +135,10 @@ export function renderAdminCategoriesPage() {
     </div>`;
 }
 
-// =========== TRASH PAGE ===========
-export function renderAdminTrashPage() {
+// =========== TRASH PAGE – CATEGORIES SECTION ONLY ===========
+export function renderDeletedCategoriesSection() {
     const categories = state.deletedAdminCategories || [];
-
-    if (categories.length === 0) {
-        return `
-        <div class="admin-page-content">
-            <div class="page-header">
-                <h1>Trash</h1>
-                <p>Deleted categories are shown here. You can restore or permanently delete them.</p>
-            </div>
-            <div class="empty-state" style="padding:80px 20px;">
-                <span class="empty-icon">🗑️</span>
-                <p>Trash is empty.</p>
-            </div>
-        </div>`;
-    }
+    if (categories.length === 0) return '';
 
     const midPoint = Math.ceil(categories.length / 2);
     const leftColumn = categories.slice(0, midPoint);
@@ -179,17 +169,11 @@ export function renderAdminTrashPage() {
     };
 
     return `
-    <div class="admin-page-content">
-        <div class="page-header">
-            <h1>🗑️ Trash</h1>
-            <p>Deleted categories are shown here. You can restore or permanently delete them.</p>
-        </div>
-        <div class="panel">
-            <h2>Deleted Categories (${categories.length})</h2>
-            <div class="tags-two-columns">
-                <div class="tags-column">${renderColumn(leftColumn)}</div>
-                <div class="tags-column">${renderColumn(rightColumn)}</div>
-            </div>
+    <div class="panel" style="margin-top: 32px;">
+        <h2>🗑️ Deleted Categories</h2>
+        <div class="tags-two-columns">
+            <div class="tags-column">${renderColumn(leftColumn)}</div>
+            <div class="tags-column">${renderColumn(rightColumn)}</div>
         </div>
     </div>`;
 }
@@ -291,7 +275,6 @@ function showAddCategoryModal(onSave, onClose) {
         messageDiv.style.display = 'block';
     };
 
-    // Close via any [data-close] button or overlay click (but only overlay)
     modal.addEventListener('click', (e) => {
         if (e.target === modal || e.target.hasAttribute('data-close')) {
             closeModal();
@@ -369,7 +352,6 @@ function showEditCategoryModal(category, onUpdate, onClose) {
     const updateBtn = document.getElementById('updateCategoryBtn');
     const messageDiv = document.getElementById('modalMessage');
 
-    // Original values for unsaved‑changes check
     const original = {
         name: category.name,
         description: category.description || '',
@@ -395,7 +377,6 @@ function showEditCategoryModal(category, onUpdate, onClose) {
         descInput.value.trim() !== original.description ||
         typeSelect.value !== original.category_type;
 
-    // Delegate close actions on the overlay
     modal.addEventListener('click', (e) => {
         if (e.target === modal || e.target.hasAttribute('data-close')) {
             attemptClose();

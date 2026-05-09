@@ -1,3 +1,6 @@
+// ============================================================
+// File: js/tags-management.js (updated renderDeletedTagsSection)
+// ============================================================
 import { apiGet, apiPost } from './api.js';
 import { state } from './state.js';
 
@@ -146,16 +149,10 @@ export function renderTagsPage() {
     </div>`;
 }
 
-// Render deleted tags section for Trash page
+// ========== TRASH – TAGS SECTION (only if there are items) ==========
 export function renderDeletedTagsSection() {
     const tags = state.deletedTags || [];
-    if (tags.length === 0) {
-        return `
-        <div class="panel" style="margin-top:32px;">
-            <h2>🗑️ Deleted Tags</h2>
-            <p style="text-align:center; color:#aaa; padding:20px;">No deleted tags.</p>
-        </div>`;
-    }
+    if (tags.length === 0) return '';
 
     const midPoint = Math.ceil(tags.length / 2);
     const leftColumnTags = tags.slice(0, midPoint);
@@ -533,7 +530,6 @@ export function attachTagsEvents(callbacks) {
     });
 }
 
-// Attach events for trash page (restore and permanent delete)
 export function attachTrashTagEvents(callbacks) {
     const { renderApp, refreshDeletedTags } = callbacks;
 
