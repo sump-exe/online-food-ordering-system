@@ -22,6 +22,12 @@ export function renderCustomerPage() {
     }
 
     for (const item of state.menuItems) {
+        const visibleTags = item.tags || [];
+        const visibleTagIds = new Set(visibleTags.map((tag) => tag.tagID));
+        const searchTags = (item.search_tags || visibleTags).map((tag) => ({
+            ...tag,
+            lower: String(tag.tag_name || '').toLowerCase()
+        }));
         // Apply multi‑keyword search
         if (keywords.length > 0) {
             const name = String(item.name || '').toLowerCase();
@@ -29,13 +35,8 @@ export function renderCustomerPage() {
             if (!catName && item.categoryID && categoryById[item.categoryID]) {
                 catName = categoryById[item.categoryID];
             }
-            const tags = (item.tags || []).map(t => ({
-                ...t,
-                lower: String(t.tag_name || '').toLowerCase()
-            }));
-
             let matched = false;
-            const matchedTags = [];
+            const matchedVisibleTags = [];
 
             for (const kw of keywords) {
                 // Name or category match
@@ -43,11 +44,11 @@ export function renderCustomerPage() {
                     matched = true;
                 }
                 // Tag match
-                for (const tag of tags) {
+                for (const tag of searchTags) {
                     if (tag.lower.includes(kw)) {
                         matched = true;
-                        if (!matchedTags.some(mt => mt.tagID === tag.tagID)) {
-                            matchedTags.push(tag);
+                        if (visibleTagIds.has(tag.tagID) && !matchedVisibleTags.some(mt => mt.tagID === tag.tagID)) {
+                            matchedVisibleTags.push(tag);
                         }
                     }
                 }
@@ -58,16 +59,16 @@ export function renderCustomerPage() {
             }
 
             // Determine which tags to display
-            if (matchedTags.length > 0) {
-                // Show only matched tags
-                item._displayTags = matchedTags.map(t => ({ tagID: t.tagID, tag_name: t.tag_name }));
+            if (matchedVisibleTags.length > 0) {
+                // Show only matched visible tags
+                item._displayTags = matchedVisibleTags.map(t => ({ tagID: t.tagID, tag_name: t.tag_name }));
             } else {
                 // Show all visible tags normally
-                item._displayTags = item.tags || [];
+                item._displayTags = visibleTags;
             }
         } else {
             // No search – show all tags
-            item._displayTags = item.tags || [];
+            item._displayTags = visibleTags;
         }
 
         const category = item.category_name || 'Other';

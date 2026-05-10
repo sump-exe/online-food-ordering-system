@@ -23,33 +23,48 @@ $userMenuActions = [
         }
         unset($item);
 
-        // Attach only visible tags for each item
+        // Keep visible tags for card badges, but include all active tags for search.
         if (!empty($items)) {
             $itemIds = array_column($items, 'itemID');
             $placeholders = implode(',', array_fill(0, count($itemIds), '?'));
             $types = str_repeat('i', count($itemIds));
-            $tagJoin = hasTableColumn($conn, 'tags', 'is_visible')
-                ? 'JOIN tags t ON t.tagID = ta.tagID AND t.is_visible = 1'
-                : 'JOIN tags t ON t.tagID = ta.tagID';
+            $hasVisibilityColumn = hasTableColumn($conn, 'tags', 'is_visible');
+            $hasSoftDeleteColumn = hasTableColumn($conn, 'tags', 'is_deleted');
+            $visibilitySelect = $hasVisibilityColumn ? ', t.is_visible' : ', 1 AS is_visible';
+            $tagFilters = ['ta.itemID IN (' . $placeholders . ')'];
+
+            if ($hasSoftDeleteColumn) {
+                $tagFilters[] = 'COALESCE(t.is_deleted, 0) = 0';
+            }
+
             $tagStmt = $conn->prepare("
-                SELECT ta.itemID, t.tagID, t.tag_name
+                SELECT ta.itemID, t.tagID, t.tag_name$visibilitySelect
                 FROM tag_assignments ta
-                $tagJoin
-                WHERE ta.itemID IN ($placeholders)
+                JOIN tags t ON t.tagID = ta.tagID
+                WHERE " . implode(' AND ', $tagFilters) . "
             ");
             $tagStmt->bind_param($types, ...$itemIds);
             $tagStmt->execute();
             $tagRes = $tagStmt->get_result();
-            $tagMap = [];
+            $visibleTagMap = [];
+            $searchTagMap = [];
             while ($row = $tagRes->fetch_assoc()) {
-                $tagMap[(int)$row['itemID']][] = [
+                $itemId = (int)$row['itemID'];
+                $tag = [
                     'tagID' => (int)$row['tagID'],
                     'tag_name' => $row['tag_name']
                 ];
+
+                $searchTagMap[$itemId][] = $tag;
+
+                if ((int)$row['is_visible'] === 1) {
+                    $visibleTagMap[$itemId][] = $tag;
+                }
             }
             $tagStmt->close();
             foreach ($items as &$item) {
-                $item['tags'] = $tagMap[$item['itemID']] ?? [];
+                $item['tags'] = $visibleTagMap[$item['itemID']] ?? [];
+                $item['search_tags'] = $searchTagMap[$item['itemID']] ?? [];
             }
             unset($item);
         }
