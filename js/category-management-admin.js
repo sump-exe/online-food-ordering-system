@@ -249,8 +249,8 @@ function showAddCategoryModal(onSave, onClose) {
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="cancelModalBtn" class="btn-secondary" data-close>Cancel</button>
-                <button id="saveCategoryBtn" class="btn-primary">Save Category</button>
+                <button id="cancelModalBtn" class="btn-secondary" data-close type="button">Cancel</button>
+                <button id="saveCategoryBtn" class="btn-primary" type="button">Save Category</button>
             </div>
         </div>
     </div>`;
@@ -337,8 +337,8 @@ function showEditCategoryModal(category, onUpdate, onClose) {
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="cancelModalBtn" class="btn-secondary" data-close>Cancel</button>
-                <button id="updateCategoryBtn" class="btn-primary">Update Category</button>
+                <button id="cancelModalBtn" class="btn-secondary" data-close type="button">Cancel</button>
+                <button id="updateCategoryBtn" class="btn-primary" type="button">Update Category</button>
             </div>
         </div>
     </div>`;
@@ -418,6 +418,35 @@ function removeModal() {
     if (existingModal) existingModal.remove();
 }
 
+function showCategoryToast(message, isError = true) {
+    const existingToast = document.getElementById('categoryToast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+
+    const toast = document.createElement('div');
+    toast.id = 'categoryToast';
+    toast.className = isError ? 'error-message' : 'success-message';
+    toast.textContent = message;
+    toast.style.position = 'fixed';
+    toast.style.top = '24px';
+    toast.style.right = '24px';
+    toast.style.zIndex = '1200';
+    toast.style.minWidth = '280px';
+    toast.style.maxWidth = '420px';
+    toast.style.boxShadow = '0 12px 28px rgba(0, 0, 0, 0.18)';
+    toast.style.border = isError ? '1px solid #fecaca' : '1px solid #a7f3d0';
+    toast.style.marginBottom = '0';
+
+    document.body.appendChild(toast);
+
+    window.setTimeout(() => {
+        if (toast.parentNode) {
+            toast.remove();
+        }
+    }, 4000);
+}
+
 function formatDate(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString);
@@ -463,11 +492,16 @@ export function attachCategoryEvents(callbacks) {
         addBtn.onclick = () => {
             showAddCategoryModal(
                 async (categoryData) => {
-                    const result = await addCategory(categoryData);
-                    if (refreshCategories) await refreshCategories();
-                    if (renderApp) await renderApp();
-                    if (setAdminMessage) setAdminMessage(result.message, 'success');
-                    return result;
+                    try {
+                        const result = await addCategory(categoryData);
+                        if (refreshCategories) await refreshCategories();
+                        if (renderApp) await renderApp();
+                        if (setAdminMessage) setAdminMessage(result.message, 'success');
+                        return result;
+                    } catch (error) {
+                        showCategoryToast(error.message, true);
+                        throw error;
+                    }
                 }
             );
         };
@@ -484,9 +518,14 @@ export function attachCategoryEvents(callbacks) {
             showEditCategoryModal(
                 category,
                 async (updatedCategory) => {
-                    await updateCategory(updatedCategory);
-                    if (refreshCategories) await refreshCategories();
-                    if (renderApp) await renderApp();
+                    try {
+                        await updateCategory(updatedCategory);
+                        if (refreshCategories) await refreshCategories();
+                        if (renderApp) await renderApp();
+                    } catch (error) {
+                        showCategoryToast(error.message, true);
+                        throw error;
+                    }
                 }
             );
         };
@@ -508,7 +547,7 @@ export function attachCategoryEvents(callbacks) {
                     setAdminMessage(result.message, 'success');
                 }
             } catch (error) {
-                alert(error.message);
+                showCategoryToast(error.message, true);
             }
         };
     });

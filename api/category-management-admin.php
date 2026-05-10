@@ -1,5 +1,35 @@
 <?php
 
+function categoryNameExists($conn, $name, $excludeCategoryId = 0) {
+    if ($excludeCategoryId > 0) {
+        $stmt = $conn->prepare(
+            "SELECT categoryID
+             FROM categories
+             WHERE name = ?
+               AND categoryID != ?
+               AND COALESCE(is_deleted, 0) = 0
+             LIMIT 1"
+        );
+        $stmt->bind_param('si', $name, $excludeCategoryId);
+    } else {
+        $stmt = $conn->prepare(
+            "SELECT categoryID
+             FROM categories
+             WHERE name = ?
+               AND COALESCE(is_deleted, 0) = 0
+             LIMIT 1"
+        );
+        $stmt->bind_param('s', $name);
+    }
+
+    $stmt->execute();
+    $stmt->store_result();
+    $exists = $stmt->num_rows > 0;
+    $stmt->close();
+
+    return $exists;
+}
+
 $adminCategoryActions = [
     // Get active categories
     'getCategories' => function ($conn, $body) {
@@ -94,8 +124,7 @@ $adminCategoryActions = [
         respond($items);
     },
     
-    // ADD CATEGORY - NO unnecessary duplicate restrictions
-    // Only prevents exact same name AND same type combination
+    // ADD CATEGORY
     'addCategory' => function ($conn, $body) {
         $name = trim($body['name'] ?? '');
         $description = trim($body['description'] ?? '');
@@ -111,24 +140,9 @@ $adminCategoryActions = [
             respondError('Invalid category type.');
         }
         
-        // ONLY check for exact same name AND same type
-        // This allows "Pizza" in food AND "Pizza" in drinks
-        // This prevents duplicate "Pizza" in food only
-        $check = $conn->prepare(
-            "SELECT categoryID
-             FROM categories
-             WHERE name = ?
-               AND category_type = ?
-               AND COALESCE(is_deleted, 0) = 0"
-        );
-        $check->bind_param('ss', $name, $categoryType);
-        $check->execute();
-        $check->store_result();
-        if ($check->num_rows > 0) {
-            $check->close();
+        if (categoryNameExists($conn, $name)) {
             respondError('Category already exists.');
         }
-        $check->close();
         
         // Insert new category
         $stmt = $conn->prepare("INSERT INTO categories (name, description, category_type) VALUES (?, ?, ?)");
@@ -169,23 +183,9 @@ $adminCategoryActions = [
             respondError('Invalid category type.');
         }
         
-        // Check for duplicate excluding current category
-        $check = $conn->prepare(
-            "SELECT categoryID
-             FROM categories
-             WHERE name = ?
-               AND category_type = ?
-               AND categoryID != ?
-               AND COALESCE(is_deleted, 0) = 0"
-        );
-        $check->bind_param('ssi', $name, $categoryType, $categoryId);
-        $check->execute();
-        $check->store_result();
-        if ($check->num_rows > 0) {
-            $check->close();
+        if (categoryNameExists($conn, $name, $categoryId)) {
             respondError('Category already exists.');
         }
-        $check->close();
         
         $stmt = $conn->prepare("UPDATE categories SET name = ?, description = ?, category_type = ? WHERE categoryID = ?");
         $stmt->bind_param('sssi', $name, $description, $categoryType, $categoryId);
@@ -273,6 +273,25 @@ $adminCategoryActions = [
 
         if ($categoryId <= 0) {
             respondError('Invalid category ID.');
+        }
+
+        $stmt = $conn->prepare(
+            "SELECT name
+             FROM categories
+             WHERE categoryID = ? AND COALESCE(is_deleted, 0) = 1"
+        );
+        $stmt->bind_param('i', $categoryId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $category = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$category) {
+            respondError('Category not found in trash.');
+        }
+
+        if (categoryNameExists($conn, $category['name'], $categoryId)) {
+            respondError('Category already exists.');
         }
 
         $stmt = $conn->prepare(
