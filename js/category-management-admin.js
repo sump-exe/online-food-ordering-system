@@ -117,9 +117,6 @@ export function renderAdminCategoriesPage() {
         <div class="page-header">
             <h1>Category Management</h1>
             <p>Manage your menu categories - organize by type (Food, Drinks, Desserts, Add-ons)</p>
-            <div class="info-banner">
-                Soft delete moves a category to Trash. Permanent delete removes it from the database and active menu items under it become uncategorized.
-            </div>
         </div>
 
         <div class="panel">
