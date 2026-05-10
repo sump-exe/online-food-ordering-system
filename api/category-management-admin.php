@@ -3,31 +3,34 @@
 function categoryNameExists($conn, $name, $excludeCategoryId = 0) {
     if ($excludeCategoryId > 0) {
         $stmt = $conn->prepare(
-            "SELECT categoryID
+            "SELECT categoryID, COALESCE(is_deleted, 0) AS is_deleted
              FROM categories
              WHERE name = ?
                AND categoryID != ?
-               AND COALESCE(is_deleted, 0) = 0
              LIMIT 1"
         );
         $stmt->bind_param('si', $name, $excludeCategoryId);
     } else {
         $stmt = $conn->prepare(
-            "SELECT categoryID
+            "SELECT categoryID, COALESCE(is_deleted, 0) AS is_deleted
              FROM categories
              WHERE name = ?
-               AND COALESCE(is_deleted, 0) = 0
              LIMIT 1"
         );
         $stmt->bind_param('s', $name);
     }
 
     $stmt->execute();
-    $stmt->store_result();
-    $exists = $stmt->num_rows > 0;
-    $stmt->close();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
 
-    return $exists;
+    if ($row) {
+        $stmt->close();
+        return ['exists' => true, 'is_deleted' => (bool)$row['is_deleted']];
+    }
+
+    $stmt->close();
+    return ['exists' => false, 'is_deleted' => false];
 }
 
 $adminCategoryActions = [
@@ -140,8 +143,13 @@ $adminCategoryActions = [
             respondError('Invalid category type.');
         }
         
-        if (categoryNameExists($conn, $name)) {
-            respondError('Category already exists.');
+        $checkResult = categoryNameExists($conn, $name);
+        if ($checkResult['exists']) {
+            if ($checkResult['is_deleted']) {
+                respondError('Cannot add category existing in trash.');
+            } else {
+                respondError('Cannot add existing category.');
+            }
         }
         
         // Insert new category
@@ -183,8 +191,13 @@ $adminCategoryActions = [
             respondError('Invalid category type.');
         }
         
-        if (categoryNameExists($conn, $name, $categoryId)) {
-            respondError('Category already exists.');
+        $checkResult = categoryNameExists($conn, $name, $categoryId);
+        if ($checkResult['exists']) {
+            if ($checkResult['is_deleted']) {
+                respondError('Cannot add category existing in trash.');
+            } else {
+                respondError('Cannot add existing category.');
+            }
         }
         
         $stmt = $conn->prepare("UPDATE categories SET name = ?, description = ?, category_type = ? WHERE categoryID = ?");
@@ -290,8 +303,13 @@ $adminCategoryActions = [
             respondError('Category not found in trash.');
         }
 
-        if (categoryNameExists($conn, $category['name'], $categoryId)) {
-            respondError('Category already exists.');
+        $checkResult = categoryNameExists($conn, $category['name'], $categoryId);
+        if ($checkResult['exists']) {
+            if ($checkResult['is_deleted']) {
+                respondError('Cannot add category existing in trash.');
+            } else {
+                respondError('Cannot add existing category.');
+            }
         }
 
         $stmt = $conn->prepare(

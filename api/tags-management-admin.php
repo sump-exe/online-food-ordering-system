@@ -78,16 +78,25 @@ $adminTagsActions = [
         if (empty($tagName)) respondError('Tag name is required.');
 
         if (tagSoftDeleteColumnsExist($conn)) {
-            $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ? AND is_deleted = 0");
+            $check = $conn->prepare("SELECT tagID, COALESCE(is_deleted, 0) AS is_deleted FROM tags WHERE tag_name = ?");
         } else {
-            $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ?");
+            $check = $conn->prepare("SELECT tagID, 0 AS is_deleted FROM tags WHERE tag_name = ?");
         }
         $check->bind_param('s', $tagName);
         $check->execute();
-        $check->store_result();
-        if ($check->num_rows > 0) {
+
+        $result = $check->get_result();
+        $row = $result ? $result->fetch_assoc() : null;
+
+        if ($row) {
             $check->close();
-            respondError('Tag name already exists.');
+            $isDeleted = (bool)$row['is_deleted'];
+
+            if ($isDeleted) {
+                respondError('Cannot add tag existing in trash.');
+            } else {
+                respondError('Cannot add existing tag.');
+            }
         }
         $check->close();
 
@@ -119,16 +128,25 @@ $adminTagsActions = [
         if (empty($tagName)) respondError('Tag name is required.');
 
         if (tagSoftDeleteColumnsExist($conn)) {
-            $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ? AND tagID != ? AND is_deleted = 0");
+            $check = $conn->prepare("SELECT tagID, COALESCE(is_deleted, 0) AS is_deleted FROM tags WHERE tag_name = ? AND tagID != ?");
         } else {
-            $check = $conn->prepare("SELECT tagID FROM tags WHERE tag_name = ? AND tagID != ?");
+            $check = $conn->prepare("SELECT tagID, 0 AS is_deleted FROM tags WHERE tag_name = ? AND tagID != ?");
         }
         $check->bind_param('si', $tagName, $tagId);
         $check->execute();
-        $check->store_result();
-        if ($check->num_rows > 0) {
+
+        $result = $check->get_result();
+        $row = $result ? $result->fetch_assoc() : null;
+
+        if ($row) {
             $check->close();
-            respondError('Tag name already exists.');
+            $isDeleted = (bool)$row['is_deleted'];
+
+            if ($isDeleted) {
+                respondError('Cannot add tag existing in trash.');
+            } else {
+                respondError('Cannot add existing tag.');
+            }
         }
         $check->close();
 

@@ -2,19 +2,24 @@
 
 function menuItemNameExists($conn, $name, $excludeItemId = 0) {
     if ($excludeItemId > 0) {
-        $stmt = $conn->prepare("SELECT itemID FROM menu_items WHERE name = ? AND itemID != ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT itemID, COALESCE(is_deleted, 0) AS is_deleted FROM menu_items WHERE name = ? AND itemID != ? LIMIT 1");
         $stmt->bind_param('si', $name, $excludeItemId);
     } else {
-        $stmt = $conn->prepare("SELECT itemID FROM menu_items WHERE name = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT itemID, COALESCE(is_deleted, 0) AS is_deleted FROM menu_items WHERE name = ? LIMIT 1");
         $stmt->bind_param('s', $name);
     }
 
     $stmt->execute();
-    $stmt->store_result();
-    $exists = $stmt->num_rows > 0;
-    $stmt->close();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
 
-    return $exists;
+    if ($row) {
+        $stmt->close();
+        return ['exists' => true, 'is_deleted' => (bool)$row['is_deleted']];
+    }
+
+    $stmt->close();
+    return ['exists' => false, 'is_deleted' => false];
 }
 
 $adminMenuInventoryActions = [
@@ -31,7 +36,15 @@ $adminMenuInventoryActions = [
         if (!$name) { respondError('Item name is required.'); }
         if ($price <= 0) { respondError('Price must be positive.'); }
         if ($stock < 0) { respondError('Stock cannot be negative.'); }
-        if (menuItemNameExists($conn, $name)) { respondError('Item name already exists.'); }
+        
+        $checkResult = menuItemNameExists($conn, $name);
+        if ($checkResult['exists']) {
+            if ($checkResult['is_deleted']) {
+                respondError('Cannot add item existing in trash.');
+            } else {
+                respondError('Cannot add existing item.');
+            }
+        }
 
         if ($categoryID !== null) {
             $stmt = $conn->prepare(
@@ -130,7 +143,15 @@ $adminMenuInventoryActions = [
         if (!$name) { respondError('Item name is required.'); }
         if ($price <= 0) { respondError('Price must be positive.'); }
         if ($stock < 0) { respondError('Stock cannot be negative.'); }
-        if (menuItemNameExists($conn, $name, $itemId)) { respondError('Item name already exists.'); }
+        
+        $checkResult = menuItemNameExists($conn, $name, $itemId);
+        if ($checkResult['exists']) {
+            if ($checkResult['is_deleted']) {
+                respondError('Cannot add item existing in trash.');
+            } else {
+                respondError('Cannot add existing item.');
+            }
+        }
         
         // Handle image upload
         $imagePath = null;
