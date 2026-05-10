@@ -126,7 +126,7 @@ $adminCategoryActions = [
         $check->store_result();
         if ($check->num_rows > 0) {
             $check->close();
-            respondError('A category with this name already exists in ' . $categoryType . '. Please use a different name or type.');
+            respondError('Category already exists.');
         }
         $check->close();
         
@@ -183,7 +183,7 @@ $adminCategoryActions = [
         $check->store_result();
         if ($check->num_rows > 0) {
             $check->close();
-            respondError('Another category with this name already exists in ' . $categoryType);
+            respondError('Category already exists.');
         }
         $check->close();
         

@@ -1,5 +1,22 @@
 <?php
 
+function menuItemNameExists($conn, $name, $excludeItemId = 0) {
+    if ($excludeItemId > 0) {
+        $stmt = $conn->prepare("SELECT itemID FROM menu_items WHERE name = ? AND itemID != ? LIMIT 1");
+        $stmt->bind_param('si', $name, $excludeItemId);
+    } else {
+        $stmt = $conn->prepare("SELECT itemID FROM menu_items WHERE name = ? LIMIT 1");
+        $stmt->bind_param('s', $name);
+    }
+
+    $stmt->execute();
+    $stmt->store_result();
+    $exists = $stmt->num_rows > 0;
+    $stmt->close();
+
+    return $exists;
+}
+
 $adminMenuInventoryActions = [
     'addMenuItem' => function ($conn, $body) {
         $name       = trim($body['name'] ?? '');
@@ -14,6 +31,7 @@ $adminMenuInventoryActions = [
         if (!$name) { respondError('Item name is required.'); }
         if ($price <= 0) { respondError('Price must be positive.'); }
         if ($stock < 0) { respondError('Stock cannot be negative.'); }
+        if (menuItemNameExists($conn, $name)) { respondError('Item name already exists.'); }
 
         if ($categoryID !== null) {
             $stmt = $conn->prepare(
@@ -112,6 +130,7 @@ $adminMenuInventoryActions = [
         if (!$name) { respondError('Item name is required.'); }
         if ($price <= 0) { respondError('Price must be positive.'); }
         if ($stock < 0) { respondError('Stock cannot be negative.'); }
+        if (menuItemNameExists($conn, $name, $itemId)) { respondError('Item name already exists.'); }
         
         // Handle image upload
         $imagePath = null;

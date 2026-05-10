@@ -144,6 +144,7 @@ export function renderAdminMenuPage() {
                 <label>Tags (optional)</label>
                 <div id="addItemTags" class="tag-checkboxes">${tagsCheckboxes || '<span style="color:#999;">No tags available</span>'}</div>
             </div>
+            <div id="addItemMessage" class="form-message" style="display:none;"></div>
         </div>
         <div class="panel">
             <h2>Stock Overview</h2>
@@ -386,6 +387,17 @@ export function attachAdminMenuInventoryEvents(callbacks) {
     
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) { logoutBtn.addEventListener('click', () => logout(renderApp)); }
+
+    const addItemMessage = document.getElementById('addItemMessage');
+    const showAddMessage = (message, isError = true) => {
+        if (!addItemMessage) {
+            return;
+        }
+
+        addItemMessage.textContent = message;
+        addItemMessage.className = `form-message ${isError ? 'error' : 'success'}`;
+        addItemMessage.style.display = 'block';
+    };
     
     document.querySelectorAll('.admin-nav-item').forEach((btn) => {
         btn.addEventListener('click', function () { setAdminPage(this.dataset.page); });
@@ -473,7 +485,7 @@ export function attachAdminMenuInventoryEvents(callbacks) {
                 setTimeout(() => { closeEditModal(); renderApp(); }, 1500);
             } catch (error) {
                 console.error('Save error:', error);
-                messageDiv.textContent = 'Error: ' + error.message;
+                messageDiv.textContent = error.message;
                 messageDiv.className = 'modal-message error';
                 messageDiv.style.display = 'block';
             }
@@ -488,8 +500,18 @@ export function attachAdminMenuInventoryEvents(callbacks) {
             const stock = parseInt(document.getElementById('newItemStock').value, 10);
             const categoryID = parseInt(document.getElementById('newItemCategory').value, 10);
             
-            if (!name || isNaN(price) || isNaN(stock)) {
-                alert('Please fill all fields');
+            if (!name) {
+                showAddMessage('Item name is required.');
+                return;
+            }
+
+            if (isNaN(price) || price <= 0) {
+                showAddMessage('Price must be a positive number.');
+                return;
+            }
+
+            if (isNaN(stock) || stock < 0) {
+                showAddMessage('Stock cannot be negative.');
                 return;
             }
             
@@ -498,7 +520,7 @@ export function attachAdminMenuInventoryEvents(callbacks) {
             
             addMenuItem({ name, price, stock, categoryID, tags: tagIds })
                 .then(() => renderApp())
-                .catch((error) => alert(error.message));
+                .catch((error) => showAddMessage(error.message));
         });
     }
 }
