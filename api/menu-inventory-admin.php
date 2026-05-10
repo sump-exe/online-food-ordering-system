@@ -217,7 +217,7 @@ $adminMenuInventoryActions = [
         $result = $stmt->get_result();
         if ($result->num_rows === 0) { $stmt->close(); respondError('Item not found in trash.'); }
         $stmt->close();
-        $stmt = $conn->prepare("DELETE FROM orderitems WHERE ItemID = ?");
+        $stmt = $conn->prepare("DELETE FROM tag_assignments WHERE itemID = ?");
         $stmt->bind_param('i', $itemId);
         $stmt->execute();
         $stmt->close();

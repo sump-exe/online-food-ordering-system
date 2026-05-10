@@ -1,7 +1,7 @@
 import { apiGet, apiPost } from './api.js';
 import { state } from './state.js';
 import { addToCart, getCartTotal, placeOrder, removeFromCart, updateQuantity } from './cart-user.js';
-import { cancelOrder, renderUserOrdersRows } from './order-history-user.js';
+import { cancelOrder, openUserOrderDetailsDrawer, renderUserOrdersRows } from './order-history-user.js';
 
 export async function loadUserMenuData(loadMenuItems, loadUserOrders) {
     await Promise.all([loadMenuItems(), loadUserOrders(state.currentUser.userID)]);
@@ -535,6 +535,14 @@ function openOrderHistoryDrawer(renderInPlace, renderApp) {
                     alert(error.message);
                 }
             }
+        });
+    });
+
+    document.querySelectorAll('#orderHistoryDrawer .viewOrderDetailsBtn').forEach((btn) => {
+        btn.addEventListener('click', function () {
+            const orderId = parseInt(this.dataset.id, 10);
+            const totalAmount = parseInt(this.dataset.total, 10) || 0;
+            openUserOrderDetailsDrawer(orderId, totalAmount);
         });
     });
 }

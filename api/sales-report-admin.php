@@ -220,13 +220,15 @@ $adminSalesReportActions = [
             $userJoinClause = "JOIN customers c ON o.customerID = c.customerID AND c.username = '$username'";
         }
         
-        $sql = "SELECT mi.itemID, mi.name, SUM(oi.quantity) AS order_frequency
+        $sql = "SELECT oi.ItemID AS itemID,
+                       COALESCE(mi.name, 'Item has been deleted') AS name,
+                       SUM(oi.quantity) AS order_frequency
                 FROM orderitems oi
                 INNER JOIN orders o ON oi.OrderID = o.OrderID
-                INNER JOIN menu_items mi ON oi.ItemID = mi.itemID
+                LEFT JOIN menu_items mi ON oi.ItemID = mi.itemID
                 $userJoinClause
                 WHERE $whereClause
-                GROUP BY mi.itemID, mi.name
+                GROUP BY oi.ItemID, COALESCE(mi.name, 'Item has been deleted')
                 ORDER BY order_frequency DESC
                 LIMIT 1";
         

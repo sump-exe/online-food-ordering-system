@@ -92,7 +92,9 @@ $userCartActions = [
         }
 
         $stmt = $conn->prepare(
-            "SELECT oi.ItemID, oi.quantity, oi.price, mi.name, mi.stock
+            "SELECT oi.ItemID, oi.quantity, oi.price,
+                    COALESCE(mi.name, 'Item has been deleted') AS name,
+                    COALESCE(mi.stock, 0) AS stock
              FROM orderitems oi
              LEFT JOIN menu_items mi ON mi.itemID = oi.ItemID
              WHERE oi.OrderID = ?"
@@ -173,8 +175,13 @@ $userCartActions = [
                 $chk->execute();
                 $result = $chk->get_result();
                 $row = $result->fetch_assoc();
-                $currentStock = $row ? $row['stock'] : 0;
                 $chk->close();
+
+                if (!$row) {
+                    throw new Exception('One or more items in your cart have been deleted.');
+                }
+
+                $currentStock = (int)$row['stock'];
 
                 if ($currentStock < $qty) {
                     throw new Exception("Not enough stock for item #$itemId.");

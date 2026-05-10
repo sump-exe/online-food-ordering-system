@@ -42,9 +42,10 @@ $paymentReceiptActions = [
 
         $stmt = $conn->prepare("
             SELECT oi.ItemID, oi.quantity, oi.price,
-                   m.name as item_name, c.name as category_name
+                   COALESCE(m.name, 'Item has been deleted') AS item_name,
+                   c.name as category_name
             FROM orderitems oi
-            JOIN menu_items m ON m.itemID = oi.ItemID
+            LEFT JOIN menu_items m ON m.itemID = oi.ItemID
             LEFT JOIN categories c ON c.categoryID = m.categoryID
             WHERE oi.OrderID = ?
         ");

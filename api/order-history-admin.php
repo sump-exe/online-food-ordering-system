@@ -51,9 +51,10 @@ $adminOrderHistoryActions = [
         }
 
         $stmt = $conn->prepare("
-            SELECT oi.ItemID, oi.quantity, oi.price, m.name as item_name
+            SELECT oi.ItemID, oi.quantity, oi.price,
+                   COALESCE(m.name, 'Item has been deleted') AS item_name
             FROM orderitems oi
-            JOIN menu_items m ON m.itemID = oi.ItemID
+            LEFT JOIN menu_items m ON m.itemID = oi.ItemID
             WHERE oi.OrderID = ?
         ");
         $stmt->bind_param('i', $orderId);
