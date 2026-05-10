@@ -1,8 +1,23 @@
 // ============================================================
-// File: js/sales-report-admin.js (completely rewritten)
+// File: js/sales-report-admin.js
 // ============================================================
 import { apiGet } from './api.js';
 import { state } from './state.js';
+
+const MONTH_LABELS = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
+];
 
 let salesOrders = [];
 
@@ -18,8 +33,144 @@ export async function loadSalesOrders() {
     }
 }
 
+async function loadMostSoldItem() {
+    try {
+        const result = await apiGet('getMostOrderedItem', buildSalesFilterParams());
+        state.mostOrderedItem = result || { name: 'No data', frequency: 0 };
+        return state.mostOrderedItem;
+    } catch (error) {
+        console.error('Failed to load most sold item:', error);
+        state.mostOrderedItem = { name: 'No data', frequency: 0 };
+        return state.mostOrderedItem;
+    }
+}
+
 export async function getOrderDetails(orderId) {
     return await apiGet('getOrderDetails', { orderId });
+}
+
+function buildSalesFilterParams() {
+    return {
+        year: state.salesFilter.year,
+        month: state.salesFilter.month,
+        day: state.salesFilter.day,
+        username: state.salesFilter.username
+    };
+}
+
+function getOrderDateParts(order) {
+    const rawValue = String(order.order_date || '');
+    const [datePart = ''] = rawValue.split(' ');
+    const [year = '', month = '', day = ''] = datePart.split('-');
+
+    return {
+        year,
+        month: month ? String(Number(month)) : '',
+        day: day ? String(Number(day)) : ''
+    };
+}
+
+function filterOrders(orders, filters = state.salesFilter) {
+    return orders.filter((order) => {
+        const parts = getOrderDateParts(order);
+
+        if (filters.year && parts.year !== String(filters.year)) {
+            return false;
+        }
+
+        if (filters.month && parts.month !== String(filters.month)) {
+            return false;
+        }
+
+        if (filters.day && parts.day !== String(filters.day)) {
+            return false;
+        }
+
+        if (filters.username && order.customer_name !== filters.username) {
+            return false;
+        }
+
+        return true;
+    });
+}
+
+function getUniqueValues(list, selector, numeric = false) {
+    const values = [...new Set(list.map(selector).filter(Boolean))];
+
+    if (numeric) {
+        return values.sort((a, b) => Number(a) - Number(b));
+    }
+
+    return values.sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function getYearOptions() {
+    return getUniqueValues(
+        salesOrders,
+        (order) => getOrderDateParts(order).year,
+        true
+    );
+}
+
+function getMonthOptions() {
+    return getUniqueValues(
+        filterOrders(salesOrders, {
+            year: state.salesFilter.year,
+            month: null,
+            day: null,
+            username: null
+        }),
+        (order) => getOrderDateParts(order).month,
+        true
+    );
+}
+
+function getDayOptions() {
+    return getUniqueValues(
+        filterOrders(salesOrders, {
+            year: state.salesFilter.year,
+            month: state.salesFilter.month,
+            day: null,
+            username: null
+        }),
+        (order) => getOrderDateParts(order).day,
+        true
+    );
+}
+
+function getUserOptions() {
+    return getUniqueValues(
+        filterOrders(salesOrders, {
+            year: state.salesFilter.year,
+            month: state.salesFilter.month,
+            day: state.salesFilter.day,
+            username: null
+        }),
+        (order) => order.customer_name,
+        false
+    );
+}
+
+function normalizeSalesFilter() {
+    const yearOptions = getYearOptions();
+    if (state.salesFilter.year && !yearOptions.includes(String(state.salesFilter.year))) {
+        state.salesFilter.year = null;
+    }
+
+    const monthOptions = getMonthOptions();
+    if (state.salesFilter.month && !monthOptions.includes(String(state.salesFilter.month))) {
+        state.salesFilter.month = null;
+    }
+
+    const dayOptions = getDayOptions();
+    if (state.salesFilter.day && !dayOptions.includes(String(state.salesFilter.day))) {
+        state.salesFilter.day = null;
+    }
+
+    const userOptions = getUserOptions();
+    if (state.salesFilter.username && !userOptions.includes(state.salesFilter.username)) {
+        state.salesFilter.username = null;
+    }
 }
 
 function formatDateTime(dateTimeStr) {
@@ -46,6 +197,16 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+function renderSelectOptions(values, selectedValue, placeholder, formatter = (value) => value) {
+    const options = values.map((value) => `
+        <option value="${escapeHtml(value)}" ${String(selectedValue) === String(value) ? 'selected' : ''}>
+            ${escapeHtml(formatter(value))}
+        </option>
+    `).join('');
+
+    return `<option value="">${placeholder}</option>${options}`;
 }
 
 // Show order items in a drawer (similar to order history)
@@ -82,7 +243,6 @@ function showOrderDetailsDrawer(orderId, customerName, totalAmount) {
     if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
     if (overlay) overlay.addEventListener('click', closeDrawer);
 
-    // Fetch and render items
     getOrderDetails(orderId)
         .then(items => {
             const body = document.getElementById('orderDetailsBody');
@@ -123,10 +283,19 @@ function showOrderDetailsDrawer(orderId, customerName, totalAmount) {
 }
 
 export function renderAdminSalesPage() {
-    const totalRevenue = salesOrders.reduce((sum, order) => sum + order.total_payment, 0);
-    const totalOrders = salesOrders.length;
+    normalizeSalesFilter();
 
-    const rowsHtml = salesOrders.map(order => {
+    const filteredOrders = filterOrders(salesOrders);
+    const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.total_payment, 0);
+    const totalOrders = filteredOrders.length;
+    const mostSoldItem = state.mostOrderedItem || { name: 'No data', frequency: 0 };
+
+    const yearOptions = getYearOptions();
+    const monthOptions = getMonthOptions();
+    const dayOptions = getDayOptions();
+    const userOptions = getUserOptions();
+
+    const rowsHtml = filteredOrders.map(order => {
         const { date, time } = formatDateTime(order.order_date);
         return `
             <tr>
@@ -135,7 +304,7 @@ export function renderAdminSalesPage() {
                 <td>${time}</td>
                 <td>${escapeHtml(order.customer_name)}</td>
                 <td>P${(order.total_payment / 100).toFixed(2)}</td>
-                <td><button class="viewOrderBtn btn-primary small-btn" data-order-id="${order.orderID}" data-customer="${escapeHtml(order.customer_name)}" data-total="${order.total_payment}">View</button></td>
+                <td><button class="viewOrderBtn btn-primary small-btn" data-order-id="${order.orderID}" data-customer="${escapeHtml(order.customer_name)}" data-total="${order.total_payment}" type="button">View</button></td>
             </tr>
         `;
     }).join('');
@@ -147,24 +316,56 @@ export function renderAdminSalesPage() {
             <p>All completed orders with receipt details</p>
         </div>
 
+        <div class="panel">
+            <h2>Filters</h2>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                <div class="form-group" style="min-width:140px; margin-bottom:0;">
+                    <label for="salesYearFilter">Year</label>
+                    <select id="salesYearFilter">
+                        ${renderSelectOptions(yearOptions, state.salesFilter.year, 'All Years')}
+                    </select>
+                </div>
+                <div class="form-group" style="min-width:140px; margin-bottom:0;">
+                    <label for="salesMonthFilter">Month</label>
+                    <select id="salesMonthFilter">
+                        ${renderSelectOptions(monthOptions, state.salesFilter.month, 'All Months', (value) => MONTH_LABELS[Number(value) - 1] || value)}
+                    </select>
+                </div>
+                <div class="form-group" style="min-width:140px; margin-bottom:0;">
+                    <label for="salesDayFilter">Day</label>
+                    <select id="salesDayFilter">
+                        ${renderSelectOptions(dayOptions, state.salesFilter.day, 'All Days')}
+                    </select>
+                </div>
+                <div class="form-group" style="min-width:220px; margin-bottom:0; flex:1;">
+                    <label for="salesUserFilter">User</label>
+                    <select id="salesUserFilter">
+                        ${renderSelectOptions(userOptions, state.salesFilter.username, 'All Users')}
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="grid-3col" style="margin-bottom: 28px;">
             <div class="stat-card" style="--accent:#ff5722;">
-                <div class="stat-icon">💰</div>
+                <div class="stat-icon">&#128176;</div>
                 <div class="stat-val">P${(totalRevenue / 100).toFixed(2)}</div>
                 <div class="stat-label">Total Revenue</div>
-                <div class="stat-sub">From completed orders</div>
+                <div class="stat-sub">From filtered completed orders</div>
             </div>
             <div class="stat-card" style="--accent:#10b981;">
-                <div class="stat-icon">📦</div>
+                <div class="stat-icon">&#128230;</div>
                 <div class="stat-val">${totalOrders}</div>
                 <div class="stat-label">Total Orders</div>
-                <div class="stat-sub">Completed</div>
+                <div class="stat-sub">Filtered completed orders</div>
             </div>
             <div class="stat-card" style="--accent:#3b82f6;">
-                <div class="stat-icon">🧾</div>
-                <div class="stat-val">${salesOrders.length}</div>
-                <div class="stat-label">Receipts Issued</div>
-                <div class="stat-sub">All with receipt numbers</div>
+                <div class="stat-icon">&#127942;</div>
+                <div class="stat-val" style="font-size:${mostSoldItem.name && mostSoldItem.name.length > 18 ? '1.2rem' : '1.55rem'};">
+                    ${escapeHtml(mostSoldItem.name || 'No data')}
+                </div>
+                <div class="stat-label">Most Sold Item</div>
+                <div class="stat-sub">${mostSoldItem.frequency > 0 ? `${mostSoldItem.frequency} sold` : 'No matching sales data'}</div>
             </div>
         </div>
 
@@ -183,7 +384,7 @@ export function renderAdminSalesPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${rowsHtml || '<tr><td colspan="6" style="text-align:center; padding:40px; color:#aaa;">No completed orders found.</td></tr>'}
+                        ${rowsHtml || '<tr><td colspan="6" style="text-align:center; padding:40px; color:#aaa;">No completed orders found for the selected filters.</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -192,21 +393,70 @@ export function renderAdminSalesPage() {
 }
 
 export function attachSalesEvents(callbacks) {
-    const { renderApp, loadSalesData } = callbacks;
+    const { renderInPlace, loadSalesData } = callbacks;
 
-    // Delegate event for dynamically rendered View buttons
-    document.addEventListener('click', (e) => {
-        const viewBtn = e.target.closest('.viewOrderBtn');
-        if (viewBtn) {
-            const orderId = parseInt(viewBtn.dataset.orderId, 10);
-            const customerName = viewBtn.dataset.customer;
-            const totalPayment = parseInt(viewBtn.dataset.total, 10);
-            showOrderDetailsDrawer(orderId, customerName, totalPayment);
+    const applyFilters = async (updater) => {
+        updater();
+        normalizeSalesFilter();
+
+        if (loadSalesData) {
+            await loadSalesData();
         }
+
+        if (renderInPlace) {
+            renderInPlace();
+        }
+    };
+
+    const yearFilter = document.getElementById('salesYearFilter');
+    if (yearFilter) {
+        yearFilter.addEventListener('change', async function () {
+            await applyFilters(() => {
+                state.salesFilter.year = this.value || null;
+                state.salesFilter.month = null;
+                state.salesFilter.day = null;
+            });
+        });
+    }
+
+    const monthFilter = document.getElementById('salesMonthFilter');
+    if (monthFilter) {
+        monthFilter.addEventListener('change', async function () {
+            await applyFilters(() => {
+                state.salesFilter.month = this.value || null;
+                state.salesFilter.day = null;
+            });
+        });
+    }
+
+    const dayFilter = document.getElementById('salesDayFilter');
+    if (dayFilter) {
+        dayFilter.addEventListener('change', async function () {
+            await applyFilters(() => {
+                state.salesFilter.day = this.value || null;
+            });
+        });
+    }
+
+    const userFilter = document.getElementById('salesUserFilter');
+    if (userFilter) {
+        userFilter.addEventListener('change', async function () {
+            await applyFilters(() => {
+                state.salesFilter.username = this.value || null;
+            });
+        });
+    }
+
+    document.querySelectorAll('.viewOrderBtn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const orderId = parseInt(button.dataset.orderId, 10);
+            const customerName = button.dataset.customer;
+            const totalPayment = parseInt(button.dataset.total, 10);
+            showOrderDetailsDrawer(orderId, customerName, totalPayment);
+        });
     });
 }
 
-// Keep compatibility with existing loadAdminSalesData if called by main.js
 export async function loadAdminSalesData() {
-    await loadSalesOrders();
+    await Promise.all([loadSalesOrders(), loadMostSoldItem()]);
 }

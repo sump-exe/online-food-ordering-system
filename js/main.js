@@ -190,6 +190,7 @@ export function renderInPlace() {
         if (state.adminPage === 'sales') {
             attachSalesEvents({
                 renderApp,
+                renderInPlace,
                 loadSalesData: async () => {
                     await loadAdminSalesData();
                 }
