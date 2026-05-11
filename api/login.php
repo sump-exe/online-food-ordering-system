@@ -62,16 +62,9 @@ $loginActions = [
             respondError('Username already exists.');
         }
 
-        // Check if email is already used
-        $stmt = $conn->prepare("SELECT customerID FROM customers WHERE email = ?");
-        $stmt->bind_param('s', $email);
-        $stmt->execute();
-        $stmt->store_result();
-        if ($stmt->num_rows > 0) {
-            $stmt->close();
+        if (checkEmailExists($conn, $email)) {
             respondError('Email address is already registered.');
         }
-        $stmt->close();
 
         // Generate 6-digit OTP for email verification
         $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -131,6 +124,14 @@ $loginActions = [
         }
 
         $email = $otpRecord['email'];
+
+        if (checkUsernameExists($conn, $username)) {
+            respondError('Username already exists.');
+        }
+        if (checkEmailExists($conn, $email)) {
+            respondError('Email address is already registered.');
+        }
+
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
         // Create the customer account

@@ -547,13 +547,21 @@ export function renderAuthScreen(root, callbacks) {
             return;
         }
 
-        document.getElementById('registerStep1').style.display = 'none';
-        document.getElementById('registerStep2').style.display = 'block';
-        document.getElementById('regOtpInput').focus();
-        startOtpCooldown(document.getElementById('regResendOtpLink'), 60);
+        const registerBtn = document.getElementById('doRegisterBtn');
+        registerBtn.disabled = true;
+        msgDiv.innerHTML = '<div class="success-message">Loading...</div>';
 
         try {
             const result = await registerUser(username, email);
+            if (!result.success) {
+                msgDiv.innerHTML = `<div class="error-message">${escapeHtml(result.message)}</div>`;
+                return;
+            }
+
+            document.getElementById('registerStep1').style.display = 'none';
+            document.getElementById('registerStep2').style.display = 'block';
+            document.getElementById('regOtpInput').focus();
+            startOtpCooldown(document.getElementById('regResendOtpLink'), 60);
             msgDiv.innerHTML = `
                 <div class="success-message">
                     ${result.message}<br><br>
@@ -562,6 +570,8 @@ export function renderAuthScreen(root, callbacks) {
             `;
         } catch (error) {
             msgDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        } finally {
+            registerBtn.disabled = false;
         }
     });
 

@@ -66,9 +66,29 @@ function validatePassword($password) {
 
 function checkUsernameExists($conn, $username) {
     $tables = ['customers' => 'customerID', 'users' => 'userID'];
+    $normalizedUsername = trim((string)$username);
+
     foreach ($tables as $table => $idField) {
-        $chk = $conn->prepare("SELECT $idField FROM $table WHERE username = ?");
-        $chk->bind_param('s', $username);
+        $chk = $conn->prepare("SELECT $idField FROM $table WHERE LOWER(username) = LOWER(?) LIMIT 1");
+        $chk->bind_param('s', $normalizedUsername);
+        $chk->execute();
+        $chk->store_result();
+        if ($chk->num_rows > 0) {
+            $chk->close();
+            return true;
+        }
+        $chk->close();
+    }
+    return false;
+}
+
+function checkEmailExists($conn, $email) {
+    $tables = ['customers' => 'customerID', 'users' => 'userID'];
+    $normalizedEmail = trim((string)$email);
+
+    foreach ($tables as $table => $idField) {
+        $chk = $conn->prepare("SELECT $idField FROM $table WHERE LOWER(email) = LOWER(?) LIMIT 1");
+        $chk->bind_param('s', $normalizedEmail);
         $chk->execute();
         $chk->store_result();
         if ($chk->num_rows > 0) {
