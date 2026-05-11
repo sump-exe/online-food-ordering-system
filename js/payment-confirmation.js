@@ -192,8 +192,9 @@ export function openPaymentConfirmationDrawer(renderInPlace, renderApp) {
                 });
             });
 
-            // Close drawer and show the classic success modal
+            // Close drawer and refresh the customer menu before showing success.
             closePayment();
+            await renderApp();
             showPaymentSuccessModal(result.payment, renderApp);
 
         } catch (error) {
