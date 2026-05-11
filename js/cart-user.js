@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { processPayment } from './payment-receipt.js';
 
 let cartSaveTimeout = null;
+let isCheckingOut = false;
 
 export function addToCart(item, renderInPlace) {
     const existing = state.customerCart.find((entry) => entry.ItemID === item.itemID);
@@ -91,6 +92,12 @@ async function createOrderAndProcessPayment({ paymentMethod = 'Cash', amountPaid
         throw new Error('Cart is empty');
     }
 
+    isCheckingOut = true;
+    if (cartSaveTimeout) {
+        clearTimeout(cartSaveTimeout);
+        cartSaveTimeout = null;
+    }
+
     const totalAmount = getCartTotal();
     const totalAmountPesos = totalAmount / 100;
     const finalAmountPaid = amountPaid ?? totalAmountPesos;
@@ -119,7 +126,16 @@ async function createOrderAndProcessPayment({ paymentMethod = 'Cash', amountPaid
         throw new Error('Payment processing failed.');
     }
 
+    for (const cartItem of cartItems) {
+        const menuItem = state.menuItems.find((item) => item.itemID === cartItem.itemID);
+        if (menuItem) {
+            menuItem.stock = Math.max(0, Number(menuItem.stock || 0) - cartItem.quantity);
+            menuItem.available = menuItem.stock > 0;
+        }
+    }
+
     state.customerCart = [];
+    isCheckingOut = false;
     return { order, payment };
 }
 
@@ -217,6 +233,9 @@ function showPaymentMethodModal(callback) {
 }
 
 async function syncCartToDb() {
+    if (isCheckingOut) {
+        return;
+    }
     if (!state.currentUser || state.currentUser.role !== 'customer') {
         return;
     }
@@ -271,6 +290,9 @@ export async function loadCartFromDb() {
 // success modal first and only calling renderApp when the user dismisses it.
 export async function confirmPayment(options = {}) {
     const { paymentMethod = 'Cash', amountPaid = null } = options;
-    const result = await createOrderAndProcessPayment({ paymentMethod, amountPaid });
-    return result;
+    try {
+        return await createOrderAndProcessPayment({ paymentMethod, amountPaid });
+    } finally {
+        isCheckingOut = false;
+    }
 }
