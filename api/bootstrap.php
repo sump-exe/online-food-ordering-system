@@ -87,6 +87,10 @@ function checkEmailExists($conn, $email) {
     $normalizedEmail = trim((string)$email);
 
     foreach ($tables as $table => $idField) {
+        if (!hasTableColumn($conn, $table, 'email')) {
+            continue;
+        }
+
         $chk = $conn->prepare("SELECT $idField FROM $table WHERE LOWER(email) = LOWER(?) LIMIT 1");
         $chk->bind_param('s', $normalizedEmail);
         $chk->execute();
