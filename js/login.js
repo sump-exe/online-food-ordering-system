@@ -430,6 +430,8 @@ function showForgotPasswordDialog(renderInPlace) {
             return;
         }
 
+        msgDiv.innerHTML = '<div class="success-message">Loading...</div>';
+
         try {
             const result = await resetPassword(currentOTP, currentUsername, newPassword, confirmPassword, currentEmail);
             msgDiv.innerHTML = `<div class="success-message">${result.message}</div>`;
