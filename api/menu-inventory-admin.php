@@ -89,7 +89,7 @@ $adminMenuInventoryActions = [
         if ($itemId <= 0) { respondError('Invalid item ID.'); }
         
         $stmt = $conn->prepare("
-            SELECT m.itemID, m.name, m.price, m.stock, m.categoryID, m.image,
+            SELECT m.itemID, m.name, m.price, m.stock, m.categoryID,
                    c.name as category_name
             FROM menu_items m
             LEFT JOIN categories c ON c.categoryID = m.categoryID
@@ -126,7 +126,7 @@ $adminMenuInventoryActions = [
             'stock' => (int)$item['stock'],
             'categoryID' => (int)($item['categoryID'] ?? 0),
             'category_name' => $item['category_name'] ?? 'Uncategorized',
-            'image' => $item['image'],
+            'image_url' => getMenuItemImageUrl($item['itemID']),
             'tags' => $tags
         ]);
     },
@@ -154,48 +154,31 @@ $adminMenuInventoryActions = [
         }
         
         // Handle image upload
-        $imagePath = null;
         if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-            $uploadDir = '../uploads/menu/';
-            if (!file_exists($uploadDir)) { mkdir($uploadDir, 0777, true); }
+            $uploadDir = ensureMenuItemImageDirectory();
             $fileExtension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
             $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
             if (!in_array($fileExtension, $allowedExtensions)) {
                 respondError('Invalid file type. Allowed: JPG, JPEG, PNG, GIF, WEBP');
             }
-            $newFilename = 'item_' . $itemId . '_' . time() . '.' . $fileExtension;
-            $uploadPath = $uploadDir . $newFilename;
-            $dbPath = 'uploads/menu/' . $newFilename;
+            $newFilename = 'menu-item-' . $itemId . '.' . $fileExtension;
+            $uploadPath = $uploadDir . DIRECTORY_SEPARATOR . $newFilename;
             if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadPath)) {
-                $stmt = $conn->prepare("SELECT image FROM menu_items WHERE itemID = ?");
-                $stmt->bind_param('i', $itemId);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                $oldItem = $result->fetch_assoc();
-                $stmt->close();
-                if ($oldItem && $oldItem['image'] && file_exists('../' . $oldItem['image'])) {
-                    unlink('../' . $oldItem['image']);
+                foreach (glob($uploadDir . DIRECTORY_SEPARATOR . 'menu-item-' . $itemId . '.*') ?: [] as $oldPath) {
+                    if ($oldPath !== $uploadPath && is_file($oldPath)) {
+                        unlink($oldPath);
+                    }
                 }
-                $imagePath = $dbPath;
             }
         }
         
         // Build update query
-        if ($imagePath) {
-            $stmt = $conn->prepare("
-                UPDATE menu_items 
-                SET name = ?, price = ?, stock = ?, categoryID = ?, image = ? 
-                WHERE itemID = ?
-            ");
-            $stmt->bind_param('siiisi', $name, $price, $stock, $categoryID, $imagePath, $itemId);
-        } else {
-            $stmt = $conn->prepare("
-                UPDATE menu_items 
-                SET name = ?, price = ?, stock = ?, categoryID = ? 
-                WHERE itemID = ?
-            ");
-            $stmt->bind_param('siiii', $name, $price, $stock, $categoryID, $itemId);
-        }
+        $stmt = $conn->prepare("
+            UPDATE menu_items 
+            SET name = ?, price = ?, stock = ?, categoryID = ? 
+            WHERE itemID = ?
+        ");
+        $stmt->bind_param('siiii', $name, $price, $stock, $categoryID, $itemId);
         executePrepared($stmt, 'Failed to update item');
         $stmt->close();
         

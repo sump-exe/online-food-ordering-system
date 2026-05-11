@@ -346,9 +346,9 @@ async function showEditModal(itemId, categoryOptions, onSaveSuccess) {
         }
         
         const imageContainer = document.getElementById('currentImageContainer');
-        if (item.image) {
+        if (item.image_url) {
             imageContainer.innerHTML = `
-                <img src="../${item.image}" alt="${escapeHtml(item.name)}" style="max-width: 150px; max-height: 150px; border-radius: 12px; border: 1px solid #ffe0c4;">
+                <img src="${item.image_url}" alt="${escapeHtml(item.name)}" style="max-width: 150px; max-height: 150px; border-radius: 12px; border: 1px solid #ffe0c4;">
                 <p style="font-size: 0.75rem; color: #666; margin-top: 8px;">Current image</p>
             `;
         } else {
