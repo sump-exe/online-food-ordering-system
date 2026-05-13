@@ -88,6 +88,7 @@ $actionMap = [
     'getSalesByDate' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByDate'],
     'getSalesByCustomer' => ['group' => 'sales_report_admin', 'handler' => 'getSalesByCustomer'],
     'getMostOrderedItem' => ['group' => 'sales_report_admin', 'handler' => 'getMostOrderedItem'],
+    'getMonthlySalesTrend' => ['group' => 'sales_report_admin', 'handler' => 'getMonthlySalesTrend'],
     
     // NEW: Sales orders list for updated report
     'getSalesOrders' => ['group' => 'sales_report_admin', 'handler' => 'getSalesOrders'],

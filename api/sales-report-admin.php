@@ -33,6 +33,39 @@ $adminSalesReportActions = [
         }
         respond($orders);
     },
+
+    'getMonthlySalesTrend' => function ($conn, $body) {
+        $username = $_GET['username'] ?? null;
+        $usernameCondition = '';
+        $customerJoin = '';
+
+        if (!empty($username) && $username !== 'null') {
+            $username = $conn->real_escape_string($username);
+            $customerJoin = 'JOIN customers c ON c.customerID = o.customerID';
+            $usernameCondition = "AND c.username = '$username'";
+        }
+
+        $sql = "SELECT YEAR(o.order_date) AS year,
+                       MONTH(o.order_date) AS month,
+                       COALESCE(SUM(o.TotalPayment), 0) AS revenue
+                FROM orders o
+                $customerJoin
+                WHERE o.Status = 'Complete' $usernameCondition
+                GROUP BY YEAR(o.order_date), MONTH(o.order_date)
+                ORDER BY YEAR(o.order_date) ASC, MONTH(o.order_date) ASC";
+
+        $result = $conn->query($sql);
+        $trend = [];
+        while ($row = $result->fetch_assoc()) {
+            $trend[] = [
+                'year' => (int)$row['year'],
+                'month' => (int)$row['month'],
+                'revenue' => (int)($row['revenue'] ?? 0)
+            ];
+        }
+
+        respond($trend);
+    },
     
     // Keep old methods for backwards compatibility if needed, but not used in new UI
     'getSalesReport' => function ($conn, $body) {

@@ -20,6 +20,7 @@ const MONTH_LABELS = [
 ];
 
 let salesOrders = [];
+let salesTrendData = [];
 
 export async function loadSalesOrders() {
     try {
@@ -30,6 +31,182 @@ export async function loadSalesOrders() {
         console.error('Failed to load sales orders:', error);
         salesOrders = [];
         return [];
+    }
+}
+
+async function loadSalesTrend() {
+    try {
+        const data = await apiGet('getMonthlySalesTrend', {
+            username: state.salesFilter.username || ''
+        });
+        salesTrendData = Array.isArray(data) ? data : [];
+        return salesTrendData;
+    } catch (error) {
+        console.error('Failed to load sales trend:', error);
+        salesTrendData = [];
+        return [];
+    }
+}
+
+function formatSalesMonthLabel(year, month) {
+    const monthIndex = Number(month) - 1;
+    const monthName = MONTH_LABELS[monthIndex] || '';
+    return `${monthName} ${year}`;
+}
+
+function renderSalesTrendChart(canvas, data) {
+    if (!canvas || !canvas.getContext) return;
+
+    const normalizedData = data
+        .map((item) => ({
+            year: Number(item.year),
+            month: Number(item.month),
+            revenue: Number(item.revenue) || 0,
+            label: formatSalesMonthLabel(item.year, item.month)
+        }))
+        .sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+
+    if (normalizedData.length === 0) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+
+    const devicePixelRatio = window.devicePixelRatio || 1;
+    const width = Math.min(820, Math.max(560, canvas.clientWidth || 720));
+    const height = 360;
+    canvas.width = width * devicePixelRatio;
+    canvas.height = height * devicePixelRatio;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const margin = { top: 32, right: 28, bottom: 56, left: 62 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    const revenues = normalizedData.map((item) => item.revenue);
+    const maxRevenue = Math.max(...revenues, 1);
+    const yRange = maxRevenue;
+
+    const points = normalizedData.map((item, idx) => {
+        const x = margin.left + (chartWidth * idx) / Math.max(1, normalizedData.length - 1);
+        const y = margin.top + chartHeight - ((item.revenue / yRange) * chartHeight);
+        return { x, y, revenue: item.revenue, label: item.label };
+    });
+
+    ctx.strokeStyle = '#e9e4dd';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#7b6c68';
+    ctx.font = '12px Inter, system-ui, sans-serif';
+
+    for (let i = 0; i <= 4; i += 1) {
+        const y = margin.top + (chartHeight * i) / 4;
+        ctx.beginPath();
+        ctx.moveTo(margin.left, y);
+        ctx.lineTo(width - margin.right, y);
+        ctx.stroke();
+
+        const value = Math.round((maxRevenue * (1 - i / 4)) / 100) / 100;
+        ctx.fillText(`P${value.toFixed(2)}`, 8, y + 4);
+    }
+
+    ctx.strokeStyle = '#d7cfc4';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(margin.left, margin.top);
+    ctx.lineTo(margin.left, margin.top + chartHeight);
+    ctx.lineTo(width - margin.right, margin.top + chartHeight);
+    ctx.stroke();
+
+    ctx.beginPath();
+    points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+    });
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2.6;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    ctx.beginPath();
+    points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+    });
+    ctx.lineTo(points[points.length - 1].x, margin.top + chartHeight);
+    ctx.lineTo(points[0].x, margin.top + chartHeight);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.14)';
+    ctx.fill();
+
+    ctx.strokeStyle = '#1f2937';
+    ctx.font = '600 14px Inter, system-ui, sans-serif';
+    ctx.fillStyle = '#1f2937';
+    ctx.fillText('Monthly Sales Trend', margin.left, 22);
+
+    ctx.fillStyle = '#3b82f6';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+
+    points.forEach((point, index) => {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        if (index === 0 || index === points.length - 1 || points.length <= 6) {
+            ctx.fillStyle = '#1f2937';
+            ctx.font = '12px Inter, system-ui, sans-serif';
+            ctx.fillText(point.label, point.x - 24, margin.top + chartHeight + 24);
+            ctx.fillStyle = '#3b82f6';
+        }
+    });
+}
+
+function openSalesTrendDrawer(data) {
+    const existingDrawer = document.getElementById('salesTrendDrawer');
+    const existingOverlay = document.getElementById('salesTrendOverlay');
+    if (existingDrawer) existingDrawer.remove();
+    if (existingOverlay) existingOverlay.remove();
+
+    const bodyContent = data && data.length > 0
+        ? `<canvas id="salesTrendCanvas" style="width:100%; height:360px; display:block; background:#fff;"></canvas>`
+        : `<div style="padding: 48px 12px; text-align:center; color:#8f7d75;">No monthly sales data available for the current filter.</div>`;
+
+    const drawerHtml = `
+    <div id="salesTrendOverlay" class="order-history-overlay open"></div>
+    <aside id="salesTrendDrawer" class="order-history-drawer open" style="width: min(760px, 95vw);">
+        <div class="order-history-drawer-header">
+            <div>
+                <div class="order-history-kicker">Sales Graph</div>
+                <h2>Sales Report Graph</h2>
+                <p style="margin-top: 8px; color: #7a6070;">Monthly revenue trend based on completed orders.</p>
+            </div>
+            <button class="btn-secondary order-history-close" id="closeSalesTrendBtn">Close</button>
+        </div>
+        <div class="order-history-drawer-body" id="salesTrendDrawerBody">
+            ${bodyContent}
+        </div>
+    </aside>`;
+
+    document.body.insertAdjacentHTML('beforeend', drawerHtml);
+
+    const closeBtn = document.getElementById('closeSalesTrendBtn');
+    const overlay = document.getElementById('salesTrendOverlay');
+    const closeDrawer = () => {
+        document.getElementById('salesTrendDrawer')?.remove();
+        document.getElementById('salesTrendOverlay')?.remove();
+    };
+    if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+    if (overlay) overlay.addEventListener('click', closeDrawer);
+
+    if (data && data.length > 0) {
+        const canvas = document.getElementById('salesTrendCanvas');
+        if (canvas) {
+            renderSalesTrendChart(canvas, data);
+        }
     }
 }
 
@@ -343,6 +520,9 @@ export function renderAdminSalesPage() {
                         ${renderSelectOptions(userOptions, state.salesFilter.username, 'All Users')}
                     </select>
                 </div>
+                <div style="display:flex; align-items:flex-end; margin-left:auto; margin-top:2px;">
+                    <button id="showSalesTrendBtn" class="btn-secondary" type="button" style="white-space:nowrap; height:42px;">Sales Report Graph</button>
+                </div>
             </div>
         </div>
 
@@ -444,6 +624,14 @@ export function attachSalesEvents(callbacks) {
             await applyFilters(() => {
                 state.salesFilter.username = this.value || null;
             });
+        });
+    }
+
+    const showSalesTrendBtn = document.getElementById('showSalesTrendBtn');
+    if (showSalesTrendBtn) {
+        showSalesTrendBtn.addEventListener('click', async () => {
+            const trendData = await loadSalesTrend();
+            openSalesTrendDrawer(trendData);
         });
     }
 
